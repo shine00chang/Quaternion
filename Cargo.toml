@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 parking_lot = "0.12.1"
-tetron = { path = "" }
+tetron = { path = "../tetron/tetron" }
