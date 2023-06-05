@@ -1,3 +1,4 @@
+mod game;
 mod tree;
 mod worker;
 
@@ -6,28 +7,61 @@ use std::thread;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use rand::prelude::*;
+
+pub fn draw (bag: &mut Vec<game::Piece>) -> game::Piece {
+    if bag.is_empty() {
+        bag.push(game::Piece::J);
+        bag.push(game::Piece::L);
+        bag.push(game::Piece::S);
+        bag.push(game::Piece::Z);
+        bag.push(game::Piece::T);
+        bag.push(game::Piece::I);
+        bag.push(game::Piece::O);
+    }
+    let mut rng = rand::thread_rng();
+    let i = rng.gen::<f64>() * bag.len() as f64;
+    let p = bag.remove(i as usize);
+    p
+}
 
 fn driver (threads: u64, iters: u64, wait_ms: u64) {
+    // Create worker.
+    let worker = Arc::new(worker::Worker::new());
+    let mut bag = vec![];
 
-        // Create worker.
-        let worker = Arc::new(worker::Worker::new());
-
-        // Spawn in worker threads.
-        let _handles: Vec<_> = 
-            (0..threads)
-            .map(|_| {
-                let worker = worker.clone();
-                thread::spawn(move || { worker.work_loop() })
-            })
-            .collect(); 
-
-        worker.start(&mut worker.state.lock());
-        for _ in 0..iters {
-            thread::sleep(Duration::from_millis(wait_ms));
-            let res = worker.advance().expect("worker.advance() returned Err");
-            println!("result: {res}");
+    // Create initial game state.
+    {
+        let mut state = tetron::State::new(); 
+        while state.pieces.len() < 5 {
+            state.pieces.push_back(draw(&mut bag));
         }
+        worker.advance(&state); 
     }
+
+    // Spawn in worker threads.
+    let _handles: Vec<_> = 
+        (0..threads)
+        .map(|_| {
+            let worker = worker.clone();
+            thread::spawn(move || { worker.work_loop() })
+        })
+        .collect(); 
+
+    worker.start(&mut worker.state.lock());
+    for _ in 0..iters {
+        thread::sleep(Duration::from_millis(wait_ms));
+        let (_, mut state) = worker.solution().expect("worker.solution() returned Err");
+
+        while state.pieces.len() < 5 {
+            state.pieces.push_back(draw(&mut bag));
+        }
+
+        worker.advance(&state);
+        println!("{}\n", state);
+
+    }
+}
 
 
 fn main () {
@@ -91,32 +125,6 @@ mod tests {
                 std::io::stdout().flush().unwrap();
             }
             println!();
-        }
-    }
-    
-    #[test]
-    fn advance_test () {
-        let threads = 10;
-        let iters   = 10;
-        let wait_ms = 100;
-
-        // Create worker.
-        let worker = Arc::new(Worker::new());
-
-        // Spawn in worker threads.
-        let _handles: Vec<JoinHandle<_>> = 
-            (0..threads)
-            .map(|_| {
-                let worker = worker.clone();
-                thread::spawn(move || { worker.work_loop() })
-            })
-            .collect(); 
-
-        worker.start(&mut worker.state.lock());
-        for _ in 0..iters {
-            thread::sleep(Duration::from_millis(wait_ms));
-            let res = worker.advance().expect("worker.advance() returned Err");
-            println!("result: {res}");
         }
     }
 }

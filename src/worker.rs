@@ -1,6 +1,7 @@
-use std::sync::Arc;
 use parking_lot::{RwLock, Mutex, Condvar};
 use super::tree::*;
+use super::game;
+
 
 pub struct Worker {
     tree: RwLock<Tree>,
@@ -18,7 +19,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             nodes: 0,
-            node_limit: 100000,
+            node_limit: 1,
             run: false
         }
     }
@@ -49,29 +50,40 @@ impl Worker {
         self.blocker.notify_all();
     }
 
-    pub fn advance (&self) -> Result<i32, ()> {
-        let out = self.tree.write().advance();
+    pub fn solution (&self) -> Result<(Evaluation, game::State), ()> {
+        self.tree.read().solution()
+    }
+
+    pub fn advance (&self, state: &game::State) {
+        self.stop(&mut self.state.lock());
+        self.tree.write().advance(state);
         self.state.lock().nodes = 0;
         self.blocker.notify_all();
-        out
+        self.start(&mut self.state.lock());
     }
 
     fn work (&self) {
-        let mutex_leaf: Arc<Mutex<Node>> = {
+        let (leaf, state) = {
             let tree = self.tree.read();
-            tree.select()
+            if let Some (out) = tree.select() {
+                out
+            } else {
+                return;
+            }
         };
                 
-        let children = {
-            let leaf = mutex_leaf.lock().clone();
-            gen_children(&leaf)
-        };
+        // If too deep
+        if state.pieces.is_empty() {
+            return;
+        }
+        
+        let children = gen_children(&state);
 
         { // Add children
             { 
                 self.state.lock().nodes += children.len() as u64;
             }
-            let mut leaf = mutex_leaf.lock(); 
+            let mut leaf = leaf.lock(); 
             leaf.expand(children);
         }
     }
