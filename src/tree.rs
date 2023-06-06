@@ -23,8 +23,6 @@ impl Tree {
             let _root = self.root.lock();
             let state = self.root_state.read();
 
-            //println!("root: {:?}\n{}", _root.mv, state);
-
             (self.root.clone(), state.clone())
         };
 
@@ -43,7 +41,7 @@ impl Tree {
         Some((mutex_node, state))
     }
 
-    pub fn solution (&self) -> Result<(Evaluation, game::State), ()> {
+    pub fn solution (&self) -> Result<(Node, game::State), ()> {
          // Find child with highest eval.
         let (score, child) = {
             let root = self.root.lock();
@@ -62,13 +60,13 @@ impl Tree {
         }?;
 
         // Reassign root & state.
+        let child = child.lock().clone();
         let state = {
-            let mv = child.lock().mv.clone();
             let mut state = self.root_state.read().clone();
-            state.apply_move(&mv)?;
+            state.apply_move(&child.mv)?;
             state
         };
-        Ok((score, state))
+        Ok((child, state))
     }
     
     pub fn advance (&mut self, state: &game::State) {
@@ -167,6 +165,10 @@ impl Node {
     pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) {
         self.children = children;
         self.expanding = false;
+    }
+
+    pub fn get_mv (&self) -> &game::Move {
+        &self.mv
     }
 }
 

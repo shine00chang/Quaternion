@@ -1,11 +1,13 @@
 mod game;
 mod tree;
 mod worker;
+mod board;
 
 
+use board::SimState;
 use std::thread;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use rand::prelude::*;
 
@@ -30,14 +32,17 @@ fn driver (threads: u64, iters: u64, wait_ms: u64) {
     let worker = Arc::new(worker::Worker::new());
     let mut bag = vec![];
 
-    // Create initial game state.
-    {
+    // Initialize sim state
+    let mut sim_state = {
         let mut state = tetron::State::new(); 
         while state.pieces.len() < 5 {
             state.pieces.push_back(draw(&mut bag));
         }
-        worker.advance(&state); 
-    }
+        SimState::new(state)
+    };
+
+    // Set initial state to worker
+    worker.advance(&sim_state.get_state()); 
 
     // Spawn in worker threads.
     let _handles: Vec<_> = 
@@ -48,18 +53,20 @@ fn driver (threads: u64, iters: u64, wait_ms: u64) {
         })
         .collect(); 
 
+    // Make color board 
+
     worker.start(&mut worker.state.lock());
     for _ in 0..iters {
         thread::sleep(Duration::from_millis(wait_ms));
-        let (_, mut state) = worker.solution().expect("worker.solution() returned Err");
+        let (node, mut state) = worker.solution().expect("worker.solution() returned Err");
 
         while state.pieces.len() < 5 {
             state.pieces.push_back(draw(&mut bag));
         }
-
         worker.advance(&state);
-        println!("{}\n", state);
 
+        sim_state.advance(node.get_mv(), &state);
+        println!("{}", sim_state);
     }
 }
 

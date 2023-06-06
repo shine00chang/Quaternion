@@ -50,7 +50,7 @@ impl Worker {
         self.blocker.notify_all();
     }
 
-    pub fn solution (&self) -> Result<(Evaluation, game::State), ()> {
+    pub fn solution (&self) -> Result<(Node, game::State), ()> {
         self.tree.read().solution()
     }
 
