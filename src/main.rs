@@ -63,10 +63,13 @@ fn driver (threads: u64, iters: u64, wait_ms: u64) {
         while state.pieces.len() < 5 {
             state.pieces.push_back(draw(&mut bag));
         }
+        let nodes = worker.state.lock().nodes;
         worker.advance(&state);
 
         sim_state.advance(node.get_mv(), &state);
+        println!("{:?}", node.get_mv());
         println!("{}", sim_state);
+        println!("{}", nodes);
     }
 }
 

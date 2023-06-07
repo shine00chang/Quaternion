@@ -22,7 +22,6 @@ impl Tree {
         let (mut mutex_node, mut state) = {
             let _root = self.root.lock();
             let state = self.root_state.read();
-
             (self.root.clone(), state.clone())
         };
 
@@ -30,8 +29,10 @@ impl Tree {
             let mut node = mutex_node.lock();
             match node.select() {
                 SelectionResult::Continue(mutex_child)  => {
-                    state.apply_move(&node.mv).expect("Could not apply move");
-                    drop(node); 
+                    drop(node);
+                    let child = mutex_child.lock();
+                    state.apply_move(child.get_mv()).expect("Could not apply move");
+                    drop(child);
                     mutex_node = mutex_child;
                 },
                 SelectionResult::Leaf    => { node.expanding = true; break; }
@@ -59,7 +60,7 @@ impl Tree {
             best.map(|b| (b.0, b.1.clone()))
         }?;
 
-        // Reassign root & state.
+        // Get solution state
         let child = child.lock().clone();
         let state = {
             let mut state = self.root_state.read().clone();
@@ -93,8 +94,8 @@ impl Tree {
         // If is a child.
         if let Some(child) = child 
         { // Reassign root & state.
-            *root = child.lock().clone();
-            root.mv = game::Move::new();
+            drop(root);
+            self.root = child.clone();
         } else 
         { // Else, reset tree
             *root = Default::default();

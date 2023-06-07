@@ -19,7 +19,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             nodes: 0,
-            node_limit: 1,
+            node_limit: 1000,
             run: false
         }
     }
@@ -58,7 +58,6 @@ impl Worker {
         self.stop(&mut self.state.lock());
         self.tree.write().advance(state);
         self.state.lock().nodes = 0;
-        self.blocker.notify_all();
         self.start(&mut self.state.lock());
     }
 
@@ -71,6 +70,7 @@ impl Worker {
                 return;
             }
         };
+        //println!("expanding:\n{}", state);
                 
         // If too deep
         if state.pieces.is_empty() {
