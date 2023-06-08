@@ -18,7 +18,8 @@ impl Default for Tree {
 }
 
 impl Tree {
-    pub fn select (&self) -> Option<(Arc<Mutex<Node>>, game::State)> {
+    pub fn select (&self) -> Option<Selection> {
+        let mut list = vec![];
         let (mut mutex_node, mut state) = {
             let _root = self.root.lock();
             let state = self.root_state.read();
@@ -33,19 +34,23 @@ impl Tree {
                     let child = mutex_child.lock();
                     state.apply_move(child.get_mv()).expect("Could not apply move");
                     drop(child);
+                    list.push(mutex_node);
                     mutex_node = mutex_child;
                 },
                 SelectionResult::Leaf    => { node.expanding = true; break; }
                 SelectionResult::Deadend => return None, 
             }
         }
-        Some((mutex_node, state))
+        list.push(mutex_node);
+        Some(Selection::new(list, state))
     }
 
+
     pub fn solution (&self) -> Result<(Node, game::State), ()> {
-         // Find child with highest eval.
+        // Find child with highest eval.
         let (score, child) = {
             let root = self.root.lock();
+
             let mut best: Result<(_, _), ()> = Err(());
             for child in &root.children {
                 let child_score = child.lock().eval;
@@ -58,13 +63,13 @@ impl Tree {
                 }
             }
             best.map(|b| (b.0, b.1.clone()))
-        }?;
+        }.expect("root has no children");
 
         // Get solution state
         let child = child.lock().clone();
         let state = {
             let mut state = self.root_state.read().clone();
-            state.apply_move(&child.mv)?;
+            state.apply_move(&child.mv).expect("could not apply move");
             state
         };
         Ok((child, state))
@@ -96,6 +101,7 @@ impl Tree {
         { // Reassign root & state.
             drop(root);
             self.root = child.clone();
+            self.root.lock().expanding = false;
         } else 
         { // Else, reset tree
             *root = Default::default();
@@ -163,9 +169,29 @@ impl Node {
         }
     }
 
-    pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) {
+    pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
+        // TODO make backprop
+        let backprop = {
+            let evals: Vec<_> = 
+                children
+                    .iter()
+                    .map(|c|  c.lock().eval)
+                    .collect();
+
+            let max_eval = 
+                *evals
+                    .iter()
+                    .max_by(|a, b| a.partial_cmp(&b).unwrap())
+                    .unwrap();
+
+            self.eval = max_eval;
+            Backprop { score: max_eval }
+        };
+
         self.children = children;
         self.expanding = false;
+
+        backprop
     }
 
     pub fn get_mv (&self) -> &game::Move {
@@ -196,6 +222,46 @@ pub fn gen_children (state: &game::State) -> Vec<Arc<Mutex<Node>>> {
     nodes
 }
 
+pub struct Selection {
+    list: Vec<Arc<Mutex<Node>>>,
+    state: game::State, 
+}
+impl Selection {
+    pub fn new (list: Vec<Arc<Mutex<Node>>>, state: game::State) -> Self {
+        Self {
+            list, state 
+        }
+    }
+
+    pub fn get_state(&self) -> &game::State {
+        &self.state
+    }
+
+    pub fn expand(&self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
+        self.list
+            .last()
+            .unwrap()
+            .lock()
+            .expand(children)
+    }
+
+    pub fn backprop(&self, backprop: Backprop) {
+        for node in self.list[0..self.list.len()-1].iter().rev() {
+            backprop.apply_to(&mut node.lock());
+        }
+    }
+}
+
+pub struct Backprop {
+    score: f32,
+}
+
+impl Backprop {
+    pub fn apply_to (&self, node: &mut Node) {
+        // TODO
+        node.eval = self.score.max(node.eval);
+    }
+}
 
 #[cfg(test)]
 mod tests {

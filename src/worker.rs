@@ -19,7 +19,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             nodes: 0,
-            node_limit: 1000,
+            node_limit: 100000,
             run: false
         }
     }
@@ -62,29 +62,24 @@ impl Worker {
     }
 
     fn work (&self) {
-        let (leaf, state) = {
-            let tree = self.tree.read();
-            if let Some (out) = tree.select() {
+        let selection = 
+            if let Some (out) = self.tree.read().select() {
                 out
             } else {
-                return;
-            }
-        };
-        //println!("expanding:\n{}", state);
-                
+                return
+            };
+            
         // If too deep
-        if state.pieces.is_empty() {
-            return;
+        if selection.get_state().pieces.len() <= 2 {
+            return
         }
         
-        let children = gen_children(&state);
+        let children = gen_children(selection.get_state());
 
         { // Add children
-            { 
-                self.state.lock().nodes += children.len() as u64;
-            }
-            let mut leaf = leaf.lock(); 
-            leaf.expand(children);
+            self.state.lock().nodes += children.len() as u64;
+            let backprop = selection.expand(children);
+            selection.backprop(backprop);
         }
     }
 
