@@ -1,59 +1,42 @@
-use super::game::{self, Piece, Move};
-use tetron::field::PIECE_MAP;
+use rand::prelude::*;
 use std::fmt;
 
-pub mod colors {
-    pub const RST: &str = "\x1b[0m";
-    pub const BLD: &str = "\x1b[1m";
-    pub const HLT: &str = "\x1b[48;5;226m";
-    macro_rules! piece_color {
-        ($p: expr) => {
-            match $p {
-                Piece::None => "\x1b[47;1m", // white
-                Piece::J => "\x1b[48;5;20m", // blue
-                Piece::L => "\x1b[48;5;208m", // bright red / orange
-                Piece::S => "\x1b[48;5;46m", // green
-                Piece::Z => "\x1b[48;5;9m", // red
-                Piece::T => "\x1b[45;1m", // magenta
-                Piece::I => "\x1b[48;5;51m", // cyan
-                Piece::O => "\x1b[48;5;226m", // yellow
-            }
-        };
-    }
-    pub(crate) use piece_color;
-}
-use colors::*;
+use quattron::game; 
+use crate::colors::*;
 
 #[derive(Clone)]
-pub(super) struct SimState {
-    m: [[Piece; 10]; 20],
-    state: game::State
+pub struct State {
+    m: [[game::Piece; 10]; 20],
+    state: game::State,
+    bag: Vec<game::Piece>
 }
 
-impl SimState {
+impl State {
     pub fn new (state: game::State) -> Self {
         Self {
-            m: [[Piece::None; 10]; 20],
-            state
+            m: [[game::Piece::None; 10]; 20],
+            state,
+            bag: vec![]
         }
     }
 
+    // Update state's field based on map, then return
     pub fn get_state (&self) -> &game::State { &self.state }
 
     // Given a move and the bot's returned state, updates the board.
     // Panics if the move does not result in the state given.
-    pub fn advance (&mut self, m: &Move, next_state: &game::State) {
+    pub fn advance (&mut self, m: &game::Move, next_state: &game::State) {
         // Apply Move
         { 
             let s = &self.state;
             let p = &if !m.hold { s.pieces[0] } 
                     else {
-                        if s.hold == Piece::None { s.pieces[1] } else { s.hold } 
+                        if s.hold == game::Piece::None { s.pieces[1] } else { s.hold } 
                     };
 
 
-            let map: &[u16; 5] = &PIECE_MAP[*p as usize][m.r as usize];
-            let n: i8 = if *p == Piece::I {5} else {3};
+            let map: &[u16; 5] = &game::PIECE_MAP[*p as usize][m.r as usize];
+            let n: i8 = if *p == game::Piece::I {5} else {3};
             let c_x: i8 = m.x - n/2;
             let c_y: i8 = m.y - n/2;
             
@@ -100,12 +83,12 @@ impl SimState {
             for y in (0..20).rev() {
                 let mut clear: bool = true;
                 for x in 0..10 {
-                    if self.m[y][x] == Piece::None {
+                    if self.m[y][x] == game::Piece::None {
                         clear = false;
                     }
                     if clears > 0 {
                         self.m[y+clears][x] = self.m[y][x];
-                        self.m[y][x] = Piece::None;
+                        self.m[y][x] = game::Piece::None;
                     }
                 }
                 if clear {
@@ -115,12 +98,12 @@ impl SimState {
         }
 
         self.state = next_state.clone();
-        // Check
+        // Check if move results in expected state
         {
             for i in 0..20 {
                 let row = {
                     let mut x = 0;
-                    for j in 0..10 { if !matches!(self.m[i][j], Piece::None) { x += 1 << j } }
+                    for j in 0..10 { if !matches!(self.m[i][j], game::Piece::None) { x += 1 << j } }
                     x as u16
                 };
                 if row != self.state.field.m[i] {
@@ -129,13 +112,60 @@ impl SimState {
             }
         }
     }
+
+    pub fn gen_garbage<R> (&mut self, rng: &mut R, lines: usize) 
+    where 
+        R: Rng
+    {
+        let lines = lines.min(10);
+        static mut PREV: u8 = 0;
+
+        let i: u8 = unsafe {
+            let mut i: u8 = PREV;
+            while i == PREV { i = rng.gen_range(0..10); }
+            PREV = i;
+            i
+        };
+        let nrow: u16 = ((1 << 10) - 1) - (1 << i);
+
+        for y in lines..20 {
+            self.m[y-lines] = self.m[y-lines];
+        }
+
+        for y in (20-lines)..20 {
+            self.state.field.m[y] = nrow;
+            for x in 0..10 {
+                self.m[y][x] = if nrow & 1 << x > 0 {game::Piece::L} else {game::Piece::None};
+            }
+        }
+    }
+
+    pub fn draw<R> (&mut self, rng: &mut R) 
+    where 
+        R: Rng
+    {
+        while self.state.pieces.len() < 6 {
+            if self.bag.is_empty() {
+                self.bag.push(game::Piece::J);
+                self.bag.push(game::Piece::L);
+                self.bag.push(game::Piece::S);
+                self.bag.push(game::Piece::Z);
+                self.bag.push(game::Piece::T);
+                self.bag.push(game::Piece::I);
+                self.bag.push(game::Piece::O);
+            }
+            let i = rng.gen_range(0..self.bag.len());
+            let p = self.bag.remove(i);
+            self.state.pieces.push_back(p);
+        }
+    }
 }
 
-impl fmt::Display for SimState {
+impl fmt::Display for State {
     fn fmt(self: &Self, f: &mut fmt::Formatter) -> fmt::Result {
         for y in 0..20 {
             for x in 0..10 {
-                if self.m[y][x] != Piece::None {
+                if self.m[y][x] != game::Piece::None {
                     let c = piece_color!(self.m[y][x]);
                     write!(f, "{}  {}", c, RST)?;
                 } else {

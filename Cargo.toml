@@ -5,13 +5,27 @@ opt-level = 1
 opt-level = 3
 
 [package]
-name = "multithreading-test"
+name = "quattron"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "quattron"
+path = "src/bot/bot.rs"
+
+[[bin]]
+name = "quattron-driver"
+path = "src/driver/driver.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 rand = "0.8.5"
+rand_chacha = "0.3.1"
 parking_lot = "0.12.1"
-tetron = { path = "../tetron/tetron" }
+tetron = { path = "../tetron" }
+
+[dependencies.clap] 
+version = "4.3.3"
+features = ["derive"]
+

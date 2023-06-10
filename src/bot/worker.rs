@@ -9,6 +9,7 @@ pub struct Worker {
     pub blocker: Condvar
 }
 
+#[derive(Clone)]
 pub struct State {
     pub nodes: u64,
     pub node_limit: u64,

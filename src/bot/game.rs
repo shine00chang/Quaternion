@@ -1,6 +1,7 @@
 pub use tetron::state::State;
 pub use tetron::mov::Move;
 pub use tetron::Piece;
+pub use tetron::field::PIECE_MAP;
 
 pub trait Workaround {
     fn apply_move (&mut self, mv: &Move) -> Result<(), ()>;
