@@ -5,16 +5,16 @@ opt-level = 1
 opt-level = 3
 
 [package]
-name = "quattron"
+name = "quaternion"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "quattron"
+name = "quaternion"
 path = "src/bot/bot.rs"
 
 [[bin]]
-name = "quattron-driver"
+name = "quaternion-driver"
 path = "src/driver/driver.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
