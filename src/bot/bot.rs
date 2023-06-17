@@ -7,12 +7,12 @@ use std::thread::{self, JoinHandle};
 
 use worker::Worker;
 
-pub struct Quattron {
+pub struct Quaternion {
     worker: Arc<Worker>,
     handles: Vec<JoinHandle<()>>
 }
 
-impl Quattron {
+impl Quaternion {
     pub fn with_threads(threads: u32) -> Self {
         // Spawn in worker threads.
         let worker = Arc::new(worker::Worker::new());

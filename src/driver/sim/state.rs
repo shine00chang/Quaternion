@@ -1,7 +1,7 @@
 use rand::prelude::*;
 use std::fmt;
 
-use quattron::game; 
+use quaternion::game; 
 use crate::colors::*;
 
 #[derive(Clone)]
