@@ -3,6 +3,8 @@ use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
 use super::game::{self, Workaround};
 
+const CUTOFF_F: f32 = 0.2;
+
 pub struct Tree {
     root_state: RwLock<tetron::state::State>,
     root: Arc<Mutex<Node>>,
@@ -176,7 +178,7 @@ pub struct Node {
     mv: tetron::mov::Move,
     children: Vec<Arc<Mutex<Node>>>,
     expanding: bool,
-    expansions: u16
+    expansions: u32
 }
 
 impl Default for Node {
@@ -244,26 +246,41 @@ impl Node {
     }
 }
 
-pub fn gen_children (state: &game::State) -> Vec<Arc<Mutex<Node>>> {
+pub fn gen_children (state: &game::State) -> Vec<Node> {
     // TEMPORARY: Using tetron's gen_moves().
-    let map = tetron::gen_moves(state);
+    tetron::gen_moves(state)
+        .into_iter()
+        .map(|(_, mv)| {
+            let mut state = state.clone();
+            state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
 
-    // make moves into node
-    let nodes = map.into_iter().map(|(_, mv)| {
-        let mut state = state.clone();
-        state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
+            let eval = tetron::evaluate(&state, tetron::EvaluatorMode::Norm);
+            Node {
+                mv,
+                eval,
+                children: vec![],
+                expanding: false,
+                expansions: 0
+            }
+        })
+        .collect()
+}
 
-        let eval = tetron::evaluate(&state, tetron::EvaluatorMode::Norm);
-        let node = Node {
-            mv,
-            eval,
-            children: vec![],
-            expanding: false,
-            expansions: 0
-        };
-
-        Arc::new(Mutex::new(node))
-    }).collect();
+// Prune / Apply Cutoff
+pub fn prune_children (mut nodes: Vec<Node>, selection: &Selection) -> Vec<Node> {
+    nodes
+        .sort_by(|a, b| {
+            b.eval.total_cmp(&a.eval)
+        });
+    let n = nodes.len();
+    let cutoff_index = { 
+        let parent_eval = selection.get_leaf().eval;
+        let mut i = 0;
+        while i < n && nodes[i].eval > CUTOFF_F * parent_eval { i += 1; }
+        i.max(20)
+    };
+    nodes
+        .drain(cutoff_index.min(n)..n);
 
     nodes
 }
@@ -281,6 +298,14 @@ impl Selection {
 
     pub fn get_state(&self) -> &game::State {
         &self.state
+    }
+
+    pub fn get_leaf(&self) -> Node {
+        self.list
+            .last()
+            .unwrap()
+            .lock()
+            .clone()
     }
 
     pub fn expand(&self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
@@ -329,7 +354,7 @@ mod tests {
         let children = gen_children(&state);
         for child in children {
             let mut state = state.clone();
-            let mv = child.lock().mv.clone();
+            let mv = child.mv.clone();
             state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
 
             println!("{:?}\n", mv.parse_list());

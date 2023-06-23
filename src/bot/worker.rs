@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use parking_lot::{RwLock, Mutex, Condvar};
 use super::tree::*;
 use super::game;
@@ -75,7 +77,14 @@ impl Worker {
             return
         }
         
-        let children = gen_children(selection.get_state());
+        let children: Vec<_> = {
+            let nodes = gen_children(selection.get_state());
+            let nodes = prune_children(nodes, &selection);
+            nodes
+                .into_iter()
+                .map(|i| Arc::new(Mutex::new(i)))
+                .collect()
+        };
 
         { // Add children
             self.state.lock().nodes += children.len() as u64;
