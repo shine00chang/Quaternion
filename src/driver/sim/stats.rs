@@ -6,13 +6,13 @@ use crate::colors::*;
 pub struct Stats {
     iters: u64,
     start_time: Instant,
-    vals: Vec<(&'static str, AverageMethod, f64)>,
+    vals: Vec<(&'static str, Vec<AverageMethod>, f64)>,
 }
 
 enum AverageMethod {
     Move,
     Second,
-    Minute
+    Minute,
 }
 use AverageMethod::*;
 
@@ -22,9 +22,9 @@ impl Stats {
             iters: 0, 
             start_time: Instant::now(),
             vals: vec![
-                ("nodes", Move, 0.0),
-                ("pieces", Second, 0.0),
-                ("attacks", Minute, 0.0)
+                ("nodes", vec![Move], 0.0),
+                ("pieces", vec![Second], 0.0),
+                ("attacks", vec![Minute, Move], 0.0)
             ]
         }
     }
@@ -44,20 +44,22 @@ impl std::fmt::Display for Stats {
         let seconds = self.start_time.elapsed().as_secs() as f64;
         write!(f, "{BLD} == Stats == {RST}\n")?;
 
-        for (k, t, s) in self.vals.iter() {
-            let suffix = match t {
-                Move => "/i",
-                Minute => "/m",
-                Second => "/s",
-            };
+        for (k, tv, s) in self.vals.iter() {
+            for t in tv {
+                let suffix = match t {
+                    Move => "/i",
+                    Minute => "/m",
+                    Second => "/s",
+                };
 
-            let v = match t {
-                Move => s / self.iters as f64,
-                Minute => s / seconds * 60.0,
-                Second => s / seconds,
-            };
+                let v = match t {
+                    Move    => s / self.iters as f64,
+                    Minute  => s / seconds * 60.0,
+                    Second  => s / seconds,
+                };
 
-            write!(f, "{k}-{suffix}\t: {:.3}\n", v)?;
+                write!(f, "{k:<8}{suffix} : {:.3}\n", v)?;
+            }
         } 
         Ok(())
     }
