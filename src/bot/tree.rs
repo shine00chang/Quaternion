@@ -45,8 +45,45 @@ impl Tree {
         Some(Selection::new(list, state))
     }
 
+    fn print_best (&self) {
+        let (mut mutex_node, mut state) = {
+            let _root = self.root.lock();
+            let state = self.root_state.read();
+            (self.root.clone(), state.clone())
+        };
+
+        loop {
+            let node = mutex_node.lock();
+
+            let mut best: Result<(_, _), ()> = Err(());
+            for child in &node.children {
+                let child_score = child.lock().eval;
+                if let Ok((score, _)) = best {
+                    if score < child_score {
+                        best = Ok((child_score, child));
+                    }
+                } else {
+                    best = Ok((child_score, child));
+                }
+            }
+
+            if let Ok((score, next)) = best.map(|b| (b.0, b.1.clone())) {
+                drop(node);
+                let child = next.lock();
+                state.apply_move(child.get_mv()).expect("Could not apply move");
+                drop(child);
+
+                mutex_node = next;
+            } else { 
+                break;
+            }
+        }
+        println!("best:\n{}", state);
+    }
 
     pub fn solution (&self) -> Result<(Node, game::State), ()> {
+        self.print_best();
+
         // Find child with highest eval.
         let (score, child) = {
             let root = self.root.lock();
@@ -138,7 +175,8 @@ pub struct Node {
     eval: Evaluation,
     mv: tetron::mov::Move,
     children: Vec<Arc<Mutex<Node>>>,
-    expanding: bool
+    expanding: bool,
+    expansions: u16
 }
 
 impl Default for Node {
@@ -147,13 +185,14 @@ impl Default for Node {
             eval: 0.0,
             mv: tetron::mov::Move::new(),
             children: vec![],
-            expanding: false
+            expanding: false,
+            expansions: 0
         }
     }
 }
 
 impl Node {
-    fn select (&self) -> SelectionResult {
+    fn select (&mut self) -> SelectionResult {
         if self.expanding {
             SelectionResult::Deadend
         } else 
@@ -163,9 +202,15 @@ impl Node {
             let candidates: Vec<_> = self.children.iter().filter(|child| !child.lock().expanding).collect();
             if candidates.is_empty() { return SelectionResult::Deadend }
 
+            /*
             let mut rng = rand::thread_rng();
             let i: usize = (rng.gen::<f64>() * candidates.len() as f64) as usize;
             SelectionResult::Continue(candidates[i].clone())
+            */ 
+
+            self.expansions += 1;
+            let out = candidates.iter().min_by_key(|c| c.lock().expansions).unwrap();
+            SelectionResult::Continue((*out).clone())
         }
     }
 
@@ -182,7 +227,7 @@ impl Node {
                 *evals
                     .iter()
                     .max_by(|a, b| a.partial_cmp(&b).unwrap())
-                    .unwrap();
+                    .unwrap_or(&-10000.0);
 
             self.eval = max_eval;
             Backprop { score: max_eval }
@@ -214,6 +259,7 @@ pub fn gen_children (state: &game::State) -> Vec<Arc<Mutex<Node>>> {
             eval,
             children: vec![],
             expanding: false,
+            expansions: 0
         };
 
         Arc::new(Mutex::new(node))
@@ -245,6 +291,8 @@ impl Selection {
             .expand(children)
     }
 
+    // Applys backpropagation update to nodes selected for the relavent expansion.
+    // Since self.list is in decending order, applies it in reverse. 
     pub fn backprop(&self, backprop: Backprop) {
         for node in self.list[0..self.list.len()-1].iter().rev() {
             backprop.apply_to(&mut node.lock());
