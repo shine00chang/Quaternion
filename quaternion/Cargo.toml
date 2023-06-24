@@ -1,0 +1,17 @@
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+
+[package]
+name = "quaternion"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "quaternion"
+
+[dependencies]
+parking_lot = "0.12.1"
+tetron = { path = "../../tetron/tetron" }

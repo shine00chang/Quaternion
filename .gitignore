@@ -1,3 +1,10 @@
-/target
-*.log
-*.txt
+.DS_Store
+target
+
+Cargo.lock
+
+quaternion/Cargo.lock
+quaternion/target
+
+driver/Cargo.lock
+

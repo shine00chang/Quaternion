@@ -1,31 +1,5 @@
-[profile.dev]
-opt-level = 1
-
-[profile.release]
-opt-level = 3
-
-[package]
-name = "quaternion"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-name = "quaternion"
-path = "src/bot/bot.rs"
-
-[[bin]]
-name = "quaternion-driver"
-path = "src/driver/driver.rs"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-parking_lot = "0.12.1"
-tetron = { path = "../tetron" }
-
-[dependencies.clap] 
-version = "4.3.3"
-features = ["derive"]
-
+[workspace]
+members = [
+    "quaternion",
+    "driver"
+]

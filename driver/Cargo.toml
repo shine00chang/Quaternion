@@ -1,0 +1,20 @@
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+
+[package]
+name = "quaternion-driver"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "quaternion-driver"
+
+[dependencies]
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+quaternion = { path = "../quaternion" }
+clap = { version = "4.3.3", features = ["derive"] }
+
