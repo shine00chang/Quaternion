@@ -1,0 +1,18 @@
+[package]
+name = "quaternion-wasm"
+version = "0.1.0"
+authors = ["Shine Chang"]
+edition = "2021"
+
+[profile.release]
+lto=true		# LLVM - Link Time Optimizations
+opt-level="s" 	# LLVM - optimize for speed over size.
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.84"
+web-sys = { version="0.3.61", features=['console'] }
+quaternion = { path="../quaternion" }
