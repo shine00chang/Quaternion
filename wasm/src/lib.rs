@@ -1,19 +1,22 @@
-use wasm_bindgen::prelude::*;
+use std::time::Duration;
 use std::collections::VecDeque;
-use web_sys::console;
 
-/*
+use wasm_thread as thread;
+use wasm_bindgen::prelude::*;
+
 macro_rules! console_log {
-    ($($arg: expr), *) => {   
-        console::log_1(
-            &JsValue::from_str(
-                &format!(
-                    $( $arg, )*
-                )
-            )
-        );  
-    }
+    ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
 }
+
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn logv(x: &JsValue);
+}
+
 
 #[wasm_bindgen]
 #[repr(u8)]
@@ -29,6 +32,21 @@ pub enum Piece {
     Some = 8,
     None = 0,
 }
+impl Piece {
+    fn to_bot (self) -> quaternion::game::Piece {
+        match self {
+            Piece::T => quaternion::game::Piece::T,
+            Piece::I => quaternion::game::Piece::I,
+            Piece::L => quaternion::game::Piece::L,
+            Piece::J => quaternion::game::Piece::J,
+            Piece::S => quaternion::game::Piece::S,
+            Piece::Z => quaternion::game::Piece::Z,
+            Piece::O => quaternion::game::Piece::O,
+            Piece::Some => quaternion::game::Piece::O, // Inaccuracy, but should not have repercussions
+            Piece::None => quaternion::game::Piece::None,
+        }
+    }
+}
 
 #[wasm_bindgen]
 #[repr(u8)]
@@ -40,7 +58,7 @@ pub enum Key {
     Cw          = 3,
     Ccw         = 4,
     _180        = 5,
-    HardDrop    = 6, 
+    HardDrop    = 6,
     SoftDrop    = 7,
     Hold        = 8
 }
@@ -50,21 +68,6 @@ pub struct Input {
     board: Vec<Piece>,
     pieces: Vec<Piece>,
     hold: Piece,
-    config: tetron::config::Config,
-}
-
-fn to_tetron (p: Piece) -> tetron::Piece {
-    match p {
-        Piece::T => tetron::Piece::T,
-        Piece::I => tetron::Piece::I,
-        Piece::O => tetron::Piece::O,
-        Piece::J => tetron::Piece::J,
-        Piece::L => tetron::Piece::L,
-        Piece::S => tetron::Piece::S,
-        Piece::Z => tetron::Piece::Z,
-        Piece::Some => tetron::Piece::O, // Inaccuracy, but should not have repercussions
-        Piece::None => tetron::Piece::None,
-    }
 }
 
 #[wasm_bindgen]
@@ -75,7 +78,6 @@ impl Input {
             board:  vec![Piece::None; 200],
             pieces: vec![Piece::None; 6],
             hold:   Piece::None,
-            config: tetron::config::Config::new(2, tetron::EvaluatorMode::Norm)
         }
     }
 
@@ -88,21 +90,16 @@ impl Input {
     pub fn set_pieces(&mut self, i: usize, p: Piece) {
         self.pieces[i] = p;
     }
-    
+
     #[wasm_bindgen]
     pub fn set_hold(&mut self, p: Piece) {
         self.hold = p;
     }
 
-    #[wasm_bindgen]
-    pub fn set_depth(&mut self, d: usize) {
-       self.config.depth = d as u8; 
-    }
-
-    fn parse (&self) -> tetron::State {
+    fn parse (&self) -> quaternion::game::State {
         // Set Board
-        let mut state = tetron::State::new();
-        
+        let mut state = quaternion::game::State::new();
+
         for y in 0..20 {
             for x in 0..10 {
                 if self.board[y*10 +x] != Piece::None {
@@ -113,36 +110,18 @@ impl Input {
 
         // Set Piece
         for p in &self.pieces {
-            state.pieces.push_back(to_tetron(*p));
+            state.pieces.push_back(p.to_bot());
         }
 
         // Set Hold
-        state.hold = to_tetron(self.hold);
+        state.hold = self.hold.to_bot();
 
         console_log!("Input State (wasm-driver):\n{}", state);
         state
     }
 
-    #[wasm_bindgen]
-    pub fn run (self) -> Output {
-        let state: tetron::State = self.parse(); 
-        let result: Option<(tetron::State, tetron::Move, f32)> = tetron::solve(&state, &self.config);
-
-        if let Some(result) = result {
-            // == Debug logging == 
-            print_state(result.0);
-            // ====
-            
-            Output::new(result.1)
-        } else {
-            console_log!("No result"); 
-            Output::none()
-        }
-    }
-    
-
     // Testing Purposes
-    #[wasm_bindgen] 
+    #[wasm_bindgen]
     pub fn test (&self, p: Piece) {
         console_log!("== Test ==: Hello From Rust!!");
         console_log!("== Test ==: Piece: {:?}", p);
@@ -150,24 +129,87 @@ impl Input {
 }
 
 #[wasm_bindgen]
+pub struct Prog {
+    bot: quaternion::Quaternion,
+}
+
+#[wasm_bindgen]
+impl Prog {
+    #[wasm_bindgen]
+    pub fn new (threads: u32) -> Self {
+        Self {
+            bot: quaternion::Quaternion::with_threads(threads),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn test (&self) {
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_secs(1));
+                    console_log!("Done {i}");
+                })
+            })
+            .collect();
+
+        thread::spawn(move || {
+            for h in handles {
+                h.join().unwrap();
+            }
+            console_log!("Rust join thread done.");
+        });
+        console_log!("Rust main thread done.");
+    }
+
+    #[wasm_bindgen]
+    pub fn stop (&self) {
+        self.bot.stop()
+    }
+
+    #[wasm_bindgen]
+    pub fn start (&self) {
+        self.bot.start()
+    }
+
+    #[wasm_bindgen]
+    pub fn end (self) {
+        self.bot.end()
+    }
+
+    #[wasm_bindgen]
+    pub fn solution (&self) -> Output {
+        let (mv, state) = self.bot.solution();
+        print_state(state);
+        Output::new(mv)
+    }
+
+    #[wasm_bindgen]
+    pub fn advance (&self, input: Input) {
+        self.bot.advance(input.parse());
+    }
+}
+
+
+#[wasm_bindgen]
 pub struct Output {
     list: VecDeque<Key>
 }
 
 impl Output {
-    pub fn new (mov: tetron::Move) -> Self {
+    pub fn new (mov: quaternion::game::Move) -> Self {
         let mut list: VecDeque<Key> = VecDeque::new();
         mov.parse_list().iter().for_each(|k| match k {
-            tetron::Key::Left       => list.push_back(Key::Left), 
-            tetron::Key::Right      => list.push_back(Key::Right),
-            tetron::Key::DASLeft    => for _ in 0..5 { list.push_back(Key::Left) },
-            tetron::Key::DASRight   => for _ in 0..5 { list.push_back(Key::Left) },
-            tetron::Key::Cw         => list.push_back(Key::Cw),
-            tetron::Key::Ccw        => list.push_back(Key::Ccw),
-            tetron::Key::_180       => list.push_back(Key::_180),
-            tetron::Key::HardDrop   => list.push_back(Key::HardDrop),
-            tetron::Key::SoftDrop   => list.push_back(Key::SoftDrop),
-            tetron::Key::Hold       => list.push_back(Key::Hold)
+            quaternion::game::Key::Left       => list.push_back(Key::Left),
+            quaternion::game::Key::Right      => list.push_back(Key::Right),
+            quaternion::game::Key::DASLeft    => for _ in 0..5 { list.push_back(Key::Left) },
+            quaternion::game::Key::DASRight   => for _ in 0..5 { list.push_back(Key::Left) },
+            quaternion::game::Key::Cw         => list.push_back(Key::Cw),
+            quaternion::game::Key::Ccw        => list.push_back(Key::Ccw),
+            quaternion::game::Key::_180       => list.push_back(Key::_180),
+            quaternion::game::Key::HardDrop   => list.push_back(Key::HardDrop),
+            quaternion::game::Key::SoftDrop   => list.push_back(Key::SoftDrop),
+            quaternion::game::Key::Hold       => list.push_back(Key::Hold)
         });
         Self { list }
     }
@@ -185,8 +227,8 @@ impl Output {
 }
 
 
-fn print_state (s: tetron::State) {
-   
+fn print_state (s: quaternion::game::State) {
+
     let mut str = String::from("");
     for y in 0..20 {
         for x in 0..10 {
@@ -212,4 +254,3 @@ fn print_state (s: tetron::State) {
     }
     console_log!("{}", str);
 }
-*/

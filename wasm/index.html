@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+
+  </head>
+  <body>
+
+    <button disabled id='run'>run</button>
+    <div class='concurrency'>
+      <p id='concurrency-amt'>Concurrency: 1</p>
+      <br/>
+      <input disabled type="range" id="concurrency" min="0" max="1" />
+    </div>
+    <p id='duration'></p>
+
+    <div id="input-grid"> </div>
+    <div id="input-queue-lbl"> </div>
+    <div id="input-queue"> </div>
+
+    <script>
+      document.getElementById('run').disabled = true;
+      document.getElementById('concurrency').disabled = true;
+    </script>
+
+    <script src='index.js'></script>
+  </body>
+</html>

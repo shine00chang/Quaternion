@@ -13,5 +13,10 @@ edition = "2021"
 name = "quaternion"
 
 [dependencies]
-parking_lot = "0.12.1"
 tetron = { path = "../../tetron/tetron" }
+
+wasm_thread = "0.2.0"
+[dependencies.parking_lot] 
+version = "0.12.1"
+features = ["nightly"]
+

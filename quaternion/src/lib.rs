@@ -3,19 +3,24 @@ mod tree;
 pub mod game;
 
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
+use std::time::Duration;
+#[cfg(not(target_family = "wasm"))]
+use std::thread;
+#[cfg(target_family = "wasm")]
+use wasm_thread as thread;
 
 use worker::Worker;
 
 pub struct Quaternion {
     worker: Arc<Worker>,
-    handles: Vec<JoinHandle<()>>
+    handles: Vec<thread::JoinHandle<()>>
 }
 
 impl Quaternion {
     pub fn with_threads(threads: u32) -> Self {
         // Spawn in worker threads.
         let worker = Arc::new(worker::Worker::new());
+        
         let handles: Vec<_> = 
             (0..threads)
             .map(|_| {
@@ -23,8 +28,6 @@ impl Quaternion {
                 thread::spawn(move || { worker.work_loop() })
             })
             .collect(); 
-
-
         Self {
             worker,
             handles

@@ -1,18 +1,31 @@
 [package]
-name = "quaternion-wasm"
+name = "wasm_driver"
 version = "0.1.0"
 authors = ["Shine Chang"]
-edition = "2021"
+edition = "2018"
+rust-version = "1.56"
 
-[profile.release]
-lto=true		# LLVM - Link Time Optimizations
-opt-level="s" 	# LLVM - optimize for speed over size.
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2.84"
-web-sys = { version="0.3.61", features=['console'] }
-quaternion = { path="../quaternion" }
+js-sys = "0.3.64"
+rayon = "1.1.0"
+wasm-bindgen = "0.2.87"
+wasm_thread = "0.2.0"
+
+quaternion = { path = "../quaternion" }
+
+[dependencies.web-sys]
+version = "0.3.23"
+features = [
+  'CanvasRenderingContext2d',
+  'ErrorEvent',
+  'Event',
+  'ImageData',
+  'Navigator',
+  'Window',
+  'Worker',
+  'DedicatedWorkerGlobalScope',
+  'MessageEvent',
+]

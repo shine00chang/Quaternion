@@ -1,5 +1,6 @@
-/target
-Cargo.lock
-yarn.lock
-.DS_Store
 node_modules
+.DS_Store
+Cargo.lock
+target
+package-lock.json
+wb-out
