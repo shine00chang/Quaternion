@@ -14,6 +14,7 @@ name = "quaternion"
 
 [dependencies]
 tetron = { path = "../../tetron/tetron" }
+rand = "0.8.3"
 
 wasm_thread = "0.2.0"
 [dependencies.parking_lot] 

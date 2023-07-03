@@ -1,6 +1,8 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
 use super::game::{self, Workaround};
+use rand::prelude::*;
+
 
 const CUTOFF_F: f32 = 0.2;
 
@@ -22,7 +24,6 @@ impl Tree {
     pub fn select (&self) -> Option<Selection> {
         let mut list = vec![];
         let (mut mutex_node, mut state) = {
-            let _root = self.root.lock();
             let state = self.root_state.read();
             (self.root.clone(), state.clone())
         };
@@ -48,7 +49,6 @@ impl Tree {
 
     fn print_best (&self) {
         let (mut mutex_node, mut state) = {
-            let _root = self.root.lock();
             let state = self.root_state.read();
             (self.root.clone(), state.clone())
         };
@@ -56,19 +56,20 @@ impl Tree {
         loop {
             let node = mutex_node.lock();
 
-            let mut best: Result<(_, _), ()> = Err(());
-            for child in &node.children {
-                let child_score = child.lock().eval;
-                if let Ok((score, _)) = best {
-                    if score < child_score {
-                        best = Ok((child_score, child));
-                    }
+            let best = 
+                if node.children.len() == 0 {
+                    Err(())
                 } else {
-                    best = Ok((child_score, child));
-                }
-            }
+                    Ok(node.children
+                        .iter()
+                        .fold((Arc::new(Mutex::new(Node::default())), f32::MIN), |a, n| {
+                            let eval = n.lock().eval;
+                            if eval > a.1 { (n.clone(), eval) } 
+                            else { a }
+                        }).0)
+                };
 
-            if let Ok((score, next)) = best.map(|b| (b.0, b.1.clone())) {
+            if let Ok(next) = best {
                 drop(node);
                 let child = next.lock();
                 state.apply_move(child.get_mv()).expect("Could not apply move");
@@ -83,28 +84,29 @@ impl Tree {
     }
 
     pub fn solution (&self) -> Result<(Node, game::State), ()> {
-        self.print_best();
+        //self.print_best();
 
         // Find child with highest eval.
-        let (score, child) = {
+        let child = {
             let root = self.root.lock();
 
-            let mut best: Result<(_, _), ()> = Err(());
-            for child in &root.children {
-                let child_score = child.lock().eval;
-                if let Ok((score, _)) = best {
-                    if score < child_score {
-                        best = Ok((child_score, child));
-                    }
-                } else {
-                    best = Ok((child_score, child));
-                }
+            if root.children.len() == 0 {
+                panic!("Root has no children");
+                //return Err(())
             }
-            best.map(|b| (b.0, b.1.clone()))
-        }.expect("root has no children");
+
+            root.children
+                .iter()
+                .fold((Arc::new(Mutex::new(Node::default())), f32::MIN), |a, n| {
+                    let eval = n.lock().eval;
+                    if eval > a.1 { (n.clone(), eval) } 
+                    else { a }
+                })
+                .0.lock().clone()
+        };
 
         // Get solution state
-        let child = child.lock().clone();
+        let child = child;
         let state = {
             let mut state = self.root_state.read().clone();
             state.apply_move(&child.mv).expect("could not apply move");
@@ -183,7 +185,7 @@ pub struct Node {
 impl Default for Node {
     fn default() -> Self {
         Self { 
-            eval: 0.0,
+            eval: f32::MIN,
             mv: tetron::mov::Move::new(),
             children: vec![],
             expanding: false,
@@ -203,13 +205,14 @@ impl Node {
             let candidates: Vec<_> = self.children.iter().filter(|child| !child.lock().expanding).collect();
             if candidates.is_empty() { return SelectionResult::Deadend }
 
+            self.expansions += 1;
+
             /*
             let mut rng = rand::thread_rng();
             let i: usize = (rng.gen::<f64>() * candidates.len() as f64) as usize;
             SelectionResult::Continue(candidates[i].clone())
             */ 
 
-            self.expansions += 1;
             let out = candidates.iter().min_by_key(|c| c.lock().expansions).unwrap();
             SelectionResult::Continue((*out).clone())
         }

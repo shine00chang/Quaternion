@@ -79,6 +79,8 @@ impl Worker {
         
         let children: Vec<_> = {
             let nodes = gen_children(selection.get_state());
+            self.state.lock().nodes += nodes.len() as u64;
+
             let nodes = prune_children(nodes, &selection);
             nodes
                 .into_iter()
@@ -87,7 +89,6 @@ impl Worker {
         };
 
         { // Add children
-            self.state.lock().nodes += children.len() as u64;
             let backprop = selection.expand(children);
             selection.backprop(backprop);
         }
