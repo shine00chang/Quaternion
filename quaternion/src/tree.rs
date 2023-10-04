@@ -1,13 +1,13 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
 use super::game::{self, Workaround};
-use rand::prelude::*;
 
+use crate::{gen, eval};
 
 const CUTOFF_F: f32 = 0.2;
 
 pub struct Tree {
-    root_state: RwLock<tetron::state::State>,
+    root_state: RwLock<game::State>,
     root: Arc<Mutex<Node>>,
 }
 
@@ -47,6 +47,7 @@ impl Tree {
         Some(Selection::new(list, state))
     }
 
+    /*
     fn print_best (&self) {
         let (mut mutex_node, mut state) = {
             let state = self.root_state.read();
@@ -82,6 +83,7 @@ impl Tree {
         }
         println!("best:\n{}", state);
     }
+    */
 
     pub fn solution (&self) -> Result<(Node, game::State), ()> {
         //self.print_best();
@@ -176,7 +178,7 @@ pub type Evaluation = f32;
 #[derive(Debug, Clone)]
 pub struct Node {
     eval: Evaluation,
-    mv: tetron::mov::Move,
+    mv: game::Move,
     children: Vec<Arc<Mutex<Node>>>,
     expanding: bool,
     expansions: u32
@@ -186,7 +188,7 @@ impl Default for Node {
     fn default() -> Self {
         Self { 
             eval: f32::MIN,
-            mv: tetron::mov::Move::new(),
+            mv: game::Move::new(),
             children: vec![],
             expanding: false,
             expansions: 0
@@ -249,14 +251,14 @@ impl Node {
 }
 
 pub fn gen_children (state: &game::State) -> Vec<Node> {
-    // TEMPORARY: Using tetron's gen_moves().
-    tetron::gen_moves(state)
+    // TEMPORARY: Using game's gen_moves().
+    gen::gen_moves(state)
         .into_iter()
         .map(|(_, mv)| {
             let mut state = state.clone();
             state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
 
-            let eval = tetron::evaluate(&state, tetron::EvaluatorMode::Norm);
+            let eval = eval::evaluate(&state, eval::Mode::Norm);
             Node {
                 mv,
                 eval,
@@ -345,13 +347,13 @@ mod tests {
     #[test]
     fn gen_children_test () {
         let mut state = game::State::new();
-        state.pieces.push_back(tetron::Piece::I);
-        state.pieces.push_back(tetron::Piece::L);
-        state.pieces.push_back(tetron::Piece::Z);
-        state.pieces.push_back(tetron::Piece::S);
-        state.pieces.push_back(tetron::Piece::J);
-        state.pieces.push_back(tetron::Piece::O);
-        state.pieces.push_back(tetron::Piece::T);
+        state.pieces.push_back(game::Piece::I);
+        state.pieces.push_back(game::Piece::L);
+        state.pieces.push_back(game::Piece::Z);
+        state.pieces.push_back(game::Piece::S);
+        state.pieces.push_back(game::Piece::J);
+        state.pieces.push_back(game::Piece::O);
+        state.pieces.push_back(game::Piece::T);
 
         let children = gen_children(&state);
         for child in children {

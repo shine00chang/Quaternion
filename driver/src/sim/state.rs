@@ -129,7 +129,8 @@ impl State {
         let nrow: u16 = ((1 << 10) - 1) - (1 << i);
 
         for y in lines..20 {
-            self.m[y-lines] = self.m[y-lines];
+            self.m[y-lines] = self.m[y];
+            self.state.field.m[y-lines] = self.state.field.m[y];
         }
 
         for y in (20-lines)..20 {

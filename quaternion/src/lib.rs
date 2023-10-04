@@ -1,11 +1,14 @@
-pub mod worker;
+mod game;
+mod gen;
+mod eval;
 mod tree;
-pub mod game;
+mod worker;
+
 
 use std::sync::Arc;
-use std::time::Duration;
 #[cfg(not(target_family = "wasm"))]
 use std::thread;
+
 #[cfg(target_family = "wasm")]
 use wasm_thread as thread;
 

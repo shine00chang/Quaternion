@@ -16,7 +16,9 @@ name = "quaternion"
 tetron = { path = "../../tetron/tetron" }
 rand = "0.8.3"
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 wasm_thread = "0.2.0"
+
 [dependencies.parking_lot] 
 version = "0.12.1"
 features = ["nightly"]

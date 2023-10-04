@@ -1,7 +1,7 @@
 pub use tetron::state::State;
 pub use tetron::mov::Move;
 pub use tetron::Piece;
-pub use tetron::field::PIECE_MAP;
+pub use tetron::field::{Field, PIECE_MAP};
 pub use tetron::Key;
 
 pub trait Workaround {

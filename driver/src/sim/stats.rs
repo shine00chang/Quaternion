@@ -13,6 +13,7 @@ enum AverageMethod {
     Move,
     Second,
     Minute,
+    Sum // No average
 }
 use AverageMethod::*;
 
@@ -23,7 +24,7 @@ impl Stats {
             start_time: Instant::now(),
             vals: vec![
                 ("nodes", vec![Move], 0.0),
-                ("pieces", vec![Second], 0.0),
+                ("pieces", vec![Second, Sum], 0.0),
                 ("attacks", vec![Minute, Move], 0.0)
             ]
         }
@@ -47,15 +48,17 @@ impl std::fmt::Display for Stats {
         for (k, tv, s) in self.vals.iter() {
             for t in tv {
                 let suffix = match t {
-                    Move => "/i",
-                    Minute => "/m",
-                    Second => "/s",
+                    Move    => "/i",
+                    Minute  => "/m",
+                    Second  => "/s",
+                    Sum     => "",
                 };
 
                 let v = match t {
                     Move    => s / self.iters as f64,
                     Minute  => s / seconds * 60.0,
                     Second  => s / seconds,
+                    Sum     => *s,
                 };
 
                 write!(f, "{k:<8}{suffix} : {:.3}\n", v)?;

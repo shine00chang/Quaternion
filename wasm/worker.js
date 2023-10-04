@@ -23,7 +23,7 @@ postMessage("init done");
 }
 
 // Start bot
-const { Prog, Input, Piece } = wasm_bindgen;
+const { Prog, Input, Piece, Key } = wasm_bindgen;
 const Bot = Prog.new(8);
 
 
@@ -72,10 +72,25 @@ function run(state, delay) {
     setTimeout(() => {
         const output = Bot.solution();
         const keys = [];
-        while (keys.at(-1) != Piece.None) {
-            keys.push(output.next());
+
+        // Parse output into array of keys
+        const add = k => {
+            keys.push(k+"-down");
+            keys.push(k+"-up");
         }
-        keys.pop();
+
+        let key = output.next();
+        while (key != Key.None) {
+            if (key == Key.Left)        add("ArrowLeft");
+            if (key == Key.Right)       add("ArrowRight");
+            if (key == Key.Cw)          add("ArrowUp");
+            if (key == Key.Ccw)         add("z");
+            if (key == Key._180)        add("a");
+            if (key == Key.HardDrop)    add(" ");
+            if (key == Key.SoftDrop)    add("ArrowDown");
+            if (key == Key.Hold)        add("c");
+            key = output.next();
+        }
 
         postMessage(["elapsed", Date.now() - run_start]);
         postMessage(["solution", keys]);
