@@ -24,7 +24,7 @@ pub use tetron::field::PIECE_MAP;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Key {
-    L, R, CW, CCW, Drop
+    L, R, CW, CCW, Drop, Hold
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -32,32 +32,7 @@ pub enum Piece {
     L, J, S, Z, T, I, O
 }
 
-impl Piece {
-    const fn cells_plain(self) -> [(i8, i8); 4] {
-        match self {
-            Piece::L => [(-1, 0), (0, 0), (1, 0), (1, 1)],
-            Piece::J => [(-1, 0), (0, 0), (1, 0), (-1, 1)],
-            Piece::S => [(-1, 0), (0, 0), (0, 1), (1, 1)],
-            Piece::Z => [(-1, 1), (0, 1), (0, 0), (1, 0)],
-            Piece::T => [(-1, 0), (0, 0), (1, 0), (0, 1)],
-            Piece::I => [(-1, 0), (0, 0), (1, 0), (2, 0)],
-            Piece::O => [(0, 0), (1, 0), (0, 1), (1, 1)],
-        }
-    }
 
-    // TODO: 
-    const fn cells(self, r: Rotation) -> [(i8, i8); 4] {
-        match self {
-            Piece::I => [(-1, 0), (0, 0), (1, 0), (2, 0)],
-            Piece::O => [(0, 0), (1, 0), (0, 1), (1, 1)],
-            Piece::T => [(-1, 0), (0, 0), (1, 0), (0, 1)],
-            Piece::L => [(-1, 0), (0, 0), (1, 0), (1, 1)],
-            Piece::J => [(-1, 0), (0, 0), (1, 0), (-1, 1)],
-            Piece::S => [(-1, 0), (0, 0), (0, 1), (1, 1)],
-            Piece::Z => [(-1, 1), (0, 1), (0, 0), (1, 0)],
-        }
-    }
-}
 
 
 
@@ -73,18 +48,11 @@ pub struct Move {
     x: i8,
     y: i8,
     r: Rotation,
-    list: u32,
+    list: u64,
 }
 impl Default for Move {
     fn default() -> Self {
         Self { x: 0, y: 0, r: Rotation::N, list: 0 }
-    }
-}
-impl Move {
-    // Extracts the keystrokes required to get to this position.
-    // TODO:
-    pub fn parse_list (&self) -> Vec<Key> {
-        vec![]
     }
 }
 

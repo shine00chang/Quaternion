@@ -236,9 +236,9 @@ pub fn gen_children (state: &game::State) -> Vec<Node> {
     // TEMPORARY: Using game's gen_moves().
     gen::gen_moves(state)
         .into_iter()
-        .map(|(_, mv)| {
+        .map(|mv| {
             let mut state = state.clone();
-            state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
+            state.apply_move(&mv).expect("Failed to apply move returned by 'gen_moves(..)'");
 
             let eval = eval::evaluate(&state, eval::Mode::Norm);
             Node {
