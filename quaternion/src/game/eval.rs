@@ -15,6 +15,6 @@ pub fn evaluate (state: &State, mode: Mode) -> f32 {
         Attack => tetron::EvaluatorMode::Attack
     };
 
-    tetron::evaluate(state, mode);
+    //tetron::evaluate(state, mode);
     0.0
 }

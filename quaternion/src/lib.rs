@@ -1,6 +1,4 @@
 mod game;
-mod gen;
-mod eval;
 mod tree;
 mod worker;
 

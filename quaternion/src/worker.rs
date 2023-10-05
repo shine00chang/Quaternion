@@ -73,7 +73,7 @@ impl Worker {
             };
             
         // If too deep
-        if selection.get_state().pieces.len() <= 2 {
+        if selection.get_state().queue_len() <= 2 {
             return
         }
         

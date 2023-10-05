@@ -1,8 +1,6 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
-use super::game::{self, Workaround};
-
-use crate::{gen, eval};
+use super::game;
 
 const CUTOFF_F: f32 = 0.2;
 
@@ -14,7 +12,7 @@ pub struct Tree {
 impl Default for Tree {
     fn default() -> Self {
         Self {
-            root_state: RwLock::new( game::State::new() ),
+            root_state: RwLock::new( game::State::default() ),
             root: Default::default()
         }
     }
@@ -99,12 +97,18 @@ impl Tree {
 
             root.children
                 .iter()
-                .fold((Arc::new(Mutex::new(Node::default())), f32::MIN), |a, n| {
+                .fold(None, |a, n| -> Option<(_, f32)> {
                     let eval = n.lock().eval;
-                    if eval > a.1 { (n.clone(), eval) } 
-                    else { a }
+                    match a { 
+                        None => Some((n.clone(), eval)),
+                        Some(a) =>
+                            if eval > a.1 { Some((n.clone(), eval)) } 
+                            else { Some(a) }
+                    }
                 })
-                .0.lock().clone()
+                .expect("No children in root, could not find one with highest eval.")
+                .0.lock()
+                .clone()
         };
 
         // Get solution state
@@ -129,7 +133,10 @@ impl Tree {
                 let mut child_state = root_state.clone();
                 child_state.apply_move(&child.lock().mv).expect("Apply move failed on Tree::advance()");
 
-                if is_child_of(state, &child_state) {
+                // NOTE: IMPORTANT: This line was changed from before the refactoring. Used to be a
+                // function called 'is_child_of(a, b)' that seemed to just check for equality between
+                // two states.
+                if state.eq(&child_state) {
                     out = Some(child.clone());
                 }
             }
@@ -151,21 +158,7 @@ impl Tree {
     }
 }
 
-fn is_child_of (a: &game::State, b: &game::State) -> bool {
-    for i in 0..20 {
-        if a.field.m[i] != b.field.m[i] {
-            return false;
-        }
-    }
-    if a.hold != b.hold { return false }
-    if a.pieces.len() < b.pieces.len() { return false }
-    for i in 0..b.pieces.len() {
-        if a.pieces[i] != b.pieces[i] {
-            return false
-        }
-    }
-    return true;
-}
+
 
 enum SelectionResult {
     Continue (Arc<Mutex<Node>>),
@@ -175,25 +168,13 @@ enum SelectionResult {
 
 pub type Evaluation = f32;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Node {
     eval: Evaluation,
     mv: game::Move,
     children: Vec<Arc<Mutex<Node>>>,
     expanding: bool,
     expansions: u32
-}
-
-impl Default for Node {
-    fn default() -> Self {
-        Self { 
-            eval: f32::MIN,
-            mv: game::Move::new(),
-            children: vec![],
-            expanding: false,
-            expansions: 0
-        }
-    }
 }
 
 impl Node {
@@ -250,6 +231,7 @@ impl Node {
     }
 }
 
+use game::{gen, eval};
 pub fn gen_children (state: &game::State) -> Vec<Node> {
     // TEMPORARY: Using game's gen_moves().
     gen::gen_moves(state)
