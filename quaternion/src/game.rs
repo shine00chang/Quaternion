@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, vec};
 
 pub mod gen;
 pub mod eval;
@@ -67,16 +67,6 @@ enum Rotation {
 }
 
 
-impl Rotation {
-    fn kicktable(piece: &Piece, from: Self, to: Self) -> [(i8, i8); 5] {
-        // TODO: Make const evaluation
-        const TABLE: [[[(i8, i8); 5]; 4]; 4] = [[[(0, 0); 5]; 4]; 4];
-
-        return TABLE[from as usize][to as usize];
-    }
-}
-
-
 
 #[derive(Clone, Debug)]
 pub struct Move {
@@ -90,6 +80,14 @@ impl Default for Move {
         Self { x: 0, y: 0, r: Rotation::N, list: 0 }
     }
 }
+impl Move {
+    // Extracts the keystrokes required to get to this position.
+    // TODO:
+    pub fn parse_list (&self) -> Vec<Key> {
+        vec![]
+    }
+}
+
 
 
 #[derive(Clone, Default, PartialEq)]
@@ -97,21 +95,6 @@ struct Board {
     v: [u32; 10]
 }
 
-
-
-struct ConflictTable {
-    v: [[u32; 10]; 4]
-}
-
-
-impl ConflictTable {
-    // TODO:
-    fn from (board: &Board) -> Self {
-        Self {
-            v: [[0; 10]; 4]
-        }
-    }
-}
 
 
 #[derive(Clone, Default, PartialEq)]
