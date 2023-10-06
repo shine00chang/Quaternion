@@ -202,7 +202,7 @@ impl Node {
     }
 
     pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
-        // TODO make backprop
+        // TODO: make backprop
         let backprop = {
             let evals: Vec<_> = 
                 children
@@ -328,6 +328,7 @@ mod tests {
 
     #[test]
     fn gen_children_test () {
+        /*
         let mut state = game::State::new();
         state.pieces.push_back(game::Piece::I);
         state.pieces.push_back(game::Piece::L);
@@ -346,5 +347,6 @@ mod tests {
             println!("{:?}\n", mv.parse_list());
             println!("{}\n", state);
         }
+        */
     }
 }

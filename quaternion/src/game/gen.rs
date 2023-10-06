@@ -90,17 +90,45 @@ fn gen_moves_one (board: &Board, piece: Piece) -> Vec<Move> {
     out.into_iter().collect()
 }
 
-
+impl Board {
+    // Returns the distance of a given point to the floor.
+    // i.e. how many units to go down till you hit the stack.
+    fn distance_to_floor (&self, x: i8, y: i8) -> i8 {
+        assert!(x >= 0 && x < 10 && y >= 0);
+        if y == 0 { return 0 }
+        let col = self.v[x as usize];
+        ((col << (32 - y)).leading_zeros() as i8).min(y)
+    }
+}
 
 impl Move {
     /// Applies Softdrop to the move, outputs if it is different.
-    // TODO:
     fn drop (&self, board: &Board, piece: Piece) -> Option<Move> {
-        None
+
+        // Get distance to drop
+        let dy = piece.cells(self.r)
+            .iter()
+            .map(|p| board.distance_to_floor(self.x + p.0, self.y + p.1))
+            .min()
+            .unwrap();
+
+        if dy == 0 { 
+            None 
+        } else { 
+            let mut nmov = Move {
+                y: self.y - dy,
+                ..*self
+            };
+            nmov.add_key(&Key::Drop);
+            Some( nmov )
+        }
     }
 
     /// Applies Left or Right to the move, outputs if it works and is different.
     fn shift (&self, dx: i8, conflict_table: &ConflictTable) -> Option<Move> {
+        assert!(dx == -1 || dx == 1);
+        if dx == -1 && self.x == 0 { return None }
+        if dx ==  1 && self.x == 9 { return None }
         let mut nmov = Move {
             x: self.x + dx,
             ..*self
@@ -145,13 +173,16 @@ impl Move {
 
     fn rotate(&self, conflict_table: &ConflictTable, from: Rotation, to: Rotation) -> Option<Move> {
         let kicks = Rotation::kicktable(conflict_table.piece, from, to);
+        println!("{:?}", kicks);
 
         for kick in kicks {
             let nmov = Move {
                 x: self.x + kick.0,
                 y: self.y + kick.1,
+                r: to,
                 ..*self
             };
+            println!("{:?}", nmov);
             if !conflict_table.conflicts(&nmov) {
                 return Some(nmov)
             }
@@ -162,27 +193,54 @@ impl Move {
 
 
 struct ConflictTable {
+    // 0 represents no conflict.
     v: [[u32; 10]; 4],
     pub piece: Piece,
 }
 
 impl ConflictTable {
-    // TODO:
+
+    /// Creates conflict table given board & piece.
     fn from (board: &Board, piece: Piece) -> Self {
-        Self {
-            v: [[0; 10]; 4],
-            piece,
+        let mut v = [[0; 10]; 4];
+
+        for r in [Rotation::N, Rotation::S, Rotation::E, Rotation::W] {
+            for (dx, dy) in piece.cells(r) {
+                for x in 0..10 {
+                    let mask = board.v.get((x + dx) as usize).copied().unwrap_or(!0);
+                    
+                    let mask = if dy < 0 { 
+                        // Need to negate twice since we want the bits spawned by the shifting to
+                        // be `1`s not `0`s.
+                        !((!mask) << -dy)
+                    } else {
+                        mask >> dy
+                    };
+
+                    v[r as usize][x as usize] |= mask;
+                }
+            }
         }
+
+        Self { v, piece }
     }
 
-    // TODO:
+    /// Determines if move touches the stack, i.e. one more unit down would conflict.
+    /// Fetches from precomputed table. 
     fn touches (&self, mov: &Move) -> bool {
-        false
+        assert!(mov.x >= 0 && mov.x < 10 && mov.y >= 0);
+        if mov.y == 0 { return true }
+        self.v[mov.r as usize][mov.x as usize] & (1 << mov.y-1) != 0
     }
 
-    // TODO:
+    /// Determines if move is conflicting with the stack.
+    /// Fetches from precomputed table
     fn conflicts (&self, mov: &Move) -> bool {
-        false
+        if mov.x >= 0 && mov.x < 10 && mov.y >= 0 {
+            self.v[mov.r as usize][mov.x as usize] & (1 << mov.y) != 0
+        } else {
+            true 
+        }
     }
 }
 
@@ -319,7 +377,8 @@ impl Rotation {
     }
 
     fn kicktable(piece: Piece, from: Self, to: Self) -> [(i8, i8); 5] {
-        Rotation::make_kicks()[piece as usize][from as usize][to as usize]
+        const TABLE: [[[[(i8, i8); 5]; 4]; 4]; 7] = Rotation::make_kicks();
+        TABLE[piece as usize][from as usize][to as usize]
     }
 }
 

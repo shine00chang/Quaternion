@@ -4,19 +4,6 @@ pub mod gen;
 pub mod eval;
 
 /*
-pub use tetron::state::State;
-pub use tetron::mov::Move;
-pub use tetron::Piece;
-use tetron::field::Field; 
-
-// PIECE_MAP for driver. 
-pub use tetron::field::PIECE_MAP;
-*/
-
-// For WASM. Not sure why. commenting for now.
-// pub use tetron::Key;
-
-/*
  * Exports Only Move, Keys, Pieces, State, gen_moves(), evaluate()
  *       output ^--------^          ^---^ Node 
  *                          ^----^ Interface
@@ -34,11 +21,9 @@ pub enum Piece {
 
 
 
-
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Rotation {
-    N, S, W, E
+    N, S, E, W
 }
 
 
@@ -62,7 +47,18 @@ impl Default for Move {
 struct Board {
     v: [u32; 10]
 }
-
+impl std::fmt::Display for Board {
+    fn fmt (&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for y in 0..20 {
+            for x in 0..10 {
+                let b = (self.v[x] & (1 << y)) != 0;
+                write!(f, "{} ", if b { '#' } else { '.' })?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
 
 
 #[derive(Clone, Default, PartialEq)]
@@ -73,8 +69,33 @@ pub struct State {
     b2b: u8,
     combo: u8,
 }
+impl std::fmt::Display for State {
+    fn fmt (&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for y in 0..20 {
+            for x in 0..10 {
+                let b = (self.board.v[x] & (1 << y)) != 0;
+                write!(f, "{} ", if b { '#' } else { '.' })?;
+            }
+            print!(" ");
+            match y {
+                0 => write!(f, "b2b:   {:>2}", self.b2b)?,
+                1 => write!(f, "combo: {:>2}", self.combo)?,
+                3 => write!(f, "hold:  {:?}", self.hold)?,
+                4 => write!(f, "queue:")?,
+                5..=9 => if self.queue.len() > y-5 {
+                    write!(f, "{:?}", self.queue[y-5])?
+                },
+                _ => ()
+            };
+            write!(f, "\n")?;
+        }
+        write!(f, "\n")?;
+        Ok(())
+    }
+}
 
 impl State {
+    // TODO:
     pub fn apply_move (&mut self, mv: &Move) -> Result<(), ()> {
         Ok(())
     }

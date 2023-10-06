@@ -1,6 +1,6 @@
 use super::*;
 
-const TEST_BOARDS: Vec<Board> = vec![
+const TEST_BOARDS: [Board; 1] = [
     // BLANK
     Board {
         v: [
@@ -18,6 +18,19 @@ const TEST_BOARDS: Vec<Board> = vec![
     },
 ];
 
+impl std::fmt::Display for ConflictTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for y in (0..20).rev() {
+            for x in 0..10 {
+                let b = self.v[2][x] & (1 << y) != 0;
+                write!(f, "{} ", if b { 'x' } else { '.' })?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
 #[test]
 fn shift_l () {
 
@@ -31,6 +44,7 @@ fn shift_l () {
         r: Rotation::N,
         list: 0,
     };
+    println!("{conflict_table}");
     let mov = mov.shift(1, &conflict_table).unwrap();
     assert_eq!(mov.x, 5);
     assert_eq!(mov.parse_list(), vec![Key::R]);
@@ -79,31 +93,31 @@ fn rotate () {
     };
     let mov = mov.drop(board, piece).unwrap();
     let mov = mov.ccw(&conflict_table).unwrap();
-    assert_eq!(mov.x, 9);
-    assert_eq!(mov.y, 18);
     assert_eq!(mov.r, Rotation::W);
+    assert_eq!(mov.x, 9);
+    assert_eq!(mov.y, 1);
     assert_eq!(mov.parse_list(), vec![Key::Drop, Key::CCW]);
 
     // TST 
     let piece = Piece::T;
     let board = Board {
         v: [
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0010,
-            0b0000_0000_0000_0000_0101,
-            0b0000_0000_0000_0001_0000,
             0b0000_0000_0000_0001_1111,
+            0b0000_0000_0000_0001_0000,
+            0b0000_0000_0000_0000_0101,
+            0b0000_0000_0000_0000_0010,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
         ]
     };
     let conflict_table = ConflictTable::from(&board, piece);
     let mov = Move {
         x: 3,
-        y: 0,
+        y: 19,
         r: Rotation::N,
         list: 0,
     }; 
@@ -153,16 +167,17 @@ fn drop () {
             0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0100,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000,
             0b0000_0000_0000_0000_0000,
         ]
     };
     let conflict_table = ConflictTable::from(&board, piece);
+
     let mov = Move {
         x: 4,
         y: 19,
