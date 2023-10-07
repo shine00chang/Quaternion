@@ -252,33 +252,6 @@ impl Move {
         ((self.y as u32) << 16) + ((self.x as u32) << 8) + (self.r as u32)
     }
 
-    const W: u64 = 3;
-    const LEN_W: u64 = 4;
-    const MASK: u64 = (1<<Self::W) - 1;
-    const LIST_CAPACITY: u64 = (64 - Self::LEN_W) / Self::W;
-    pub fn list_len (&self) -> u64 {
-        self.list & Self::MASK
-    }
-
-    /// Parses bitset list.
-    pub fn parse_list (&self) -> Vec<Key> {
-        (0..self.list_len()).map(|i| {
-            let shifts = i * Self::W + Self::LEN_W;
-            let mask = Self::MASK << shifts;
-            let val  = (self.list & mask) >> shifts;
-            let key  = match val {
-                1 => Key::L,
-                2 => Key::R,
-                3 => Key::CW,
-                4 => Key::CCW,
-                5 => Key::Drop,
-                6 => Key::Hold,
-                _ => panic!("none such key encoding")
-            };
-            key
-        }).collect()
-    }
-
     /// Adds key to bitset list.
     fn add_key (&mut self, key: &Key) {
         if !self.list_has_space() {
@@ -393,7 +366,7 @@ impl Piece {
         }
     }
 
-    const fn cells (self, r: Rotation) -> [(i8, i8); 4] {
+    pub const fn cells (self, r: Rotation) -> [(i8, i8); 4] {
         match self {
             Piece::L => expand_for!(for pair in [(-1, 0), (0, 0), (1, 0), ( 1, 1)] Self::rotate(pair, r)),
             Piece::J => expand_for!(for pair in [(-1, 0), (0, 0), (1, 0), (-1, 1)] Self::rotate(pair, r)),

@@ -1,6 +1,7 @@
-use std::{collections::VecDeque, vec};
+use std::collections::VecDeque;
 
-pub mod gen;
+pub mod movegen;
+pub mod advance;
 pub mod eval;
 
 /*
@@ -42,11 +43,42 @@ impl Default for Move {
 }
 
 
+impl Move {
+    const W: u64 = 3;
+    const LEN_W: u64 = 4;
+    const MASK: u64 = (1<<Self::W) - 1;
+    const LIST_CAPACITY: u64 = (64 - Self::LEN_W) / Self::W;
+    pub fn list_len (&self) -> u64 {
+        self.list & Self::MASK
+    }
+
+    /// Parses bitset list.
+    pub fn parse_list (&self) -> Vec<Key> {
+        (0..self.list_len()).map(|i| {
+            let shifts = i * Self::W + Self::LEN_W;
+            let mask = Self::MASK << shifts;
+            let val  = (self.list & mask) >> shifts;
+            let key  = match val {
+                1 => Key::L,
+                2 => Key::R,
+                3 => Key::CW,
+                4 => Key::CCW,
+                5 => Key::Drop,
+                6 => Key::Hold,
+                _ => panic!("none such key encoding")
+            };
+            key
+        }).collect()
+    }
+}
+
 
 #[derive(Clone, Default, PartialEq)]
 struct Board {
     v: [u32; 10]
 }
+
+
 impl std::fmt::Display for Board {
     fn fmt (&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for y in 0..20 {
@@ -59,6 +91,7 @@ impl std::fmt::Display for Board {
         Ok(())
     }
 }
+
 
 
 #[derive(Clone, Default, PartialEq)]
@@ -94,16 +127,7 @@ impl std::fmt::Display for State {
     }
 }
 
-impl State {
-    // TODO:
-    pub fn apply_move (&mut self, mv: &Move) -> Result<(), ()> {
-        Ok(())
-    }
 
-    pub fn queue_len (&self) -> usize {
-        self.queue.len()
-    }
-}
 
 
 #[cfg(test)]

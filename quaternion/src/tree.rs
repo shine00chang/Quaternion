@@ -32,7 +32,7 @@ impl Tree {
                 SelectionResult::Continue(mutex_child)  => {
                     drop(node);
                     let child = mutex_child.lock();
-                    state.apply_move(child.get_mv()).expect("Could not apply move");
+                    state = state.apply_move(child.get_mv());
                     drop(child);
                     list.push(mutex_node);
                     mutex_node = mutex_child;
@@ -113,11 +113,7 @@ impl Tree {
 
         // Get solution state
         let child = child;
-        let state = {
-            let mut state = self.root_state.read().clone();
-            state.apply_move(&child.mv).expect("could not apply move");
-            state
-        };
+        let state = self.root_state.read().clone().apply_move(&child.mv);
         Ok((child, state))
     }
     
@@ -130,8 +126,8 @@ impl Tree {
 
             let mut out = None;
             for child in &root.children {
-                let mut child_state = root_state.clone();
-                child_state.apply_move(&child.lock().mv).expect("Apply move failed on Tree::advance()");
+                let child_state = root_state.clone()
+                    .apply_move(&child.lock().mv);
 
                 // NOTE: IMPORTANT: This line was changed from before the refactoring. Used to be a
                 // function called 'is_child_of(a, b)' that seemed to just check for equality between
@@ -170,11 +166,11 @@ pub type Evaluation = f32;
 
 #[derive(Debug, Clone, Default)]
 pub struct Node {
-    eval: Evaluation,
-    mv: game::Move,
-    children: Vec<Arc<Mutex<Node>>>,
-    expanding: bool,
-    expansions: u32
+    pub eval: Evaluation,
+    pub mv: game::Move,
+    pub children: Vec<Arc<Mutex<Node>>>,
+    pub expanding: bool,
+    pub expansions: u32
 }
 
 impl Node {
@@ -231,24 +227,10 @@ impl Node {
     }
 }
 
-use game::{gen, eval};
 pub fn gen_children (state: &game::State) -> Vec<Node> {
-    // TEMPORARY: Using game's gen_moves().
-    gen::gen_moves(state)
+    game::movegen::gen_moves(state)
         .into_iter()
-        .map(|mv| {
-            let mut state = state.clone();
-            state.apply_move(&mv).expect("Failed to apply move returned by 'gen_moves(..)'");
-
-            let eval = eval::evaluate(&state, eval::Mode::Norm);
-            Node {
-                mv,
-                eval,
-                children: vec![],
-                expanding: false,
-                expansions: 0
-            }
-        })
+        .map(|mv| state.clone().make_node(mv, game::eval::Mode::Norm))
         .collect()
 }
 
