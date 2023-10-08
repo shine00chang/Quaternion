@@ -8,13 +8,6 @@ pub enum Mode {
 }
 
 
-pub struct MetaData {
-    pub attacks: u8,
-    pub ds: u8,
-    pub tspin: bool
-}
-
-
 struct Factors {
     ideal_h: f32,
     well_threshold: f32,
@@ -98,8 +91,7 @@ const WELL_PLACEMENT     : [f32; 10] = [-1.0, -1.0, 0.8, 1.2, 1.0, 1.0, 1.2, 0.8
 
 
 /// Heuristic Evaluation function
-/// TODO: 
-pub fn evaluate (state: &State, meta: MetaData, mode: Mode) -> f32 {
+pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
 
     const FW: usize = 10;
     const FH: usize = 20;
@@ -227,7 +219,7 @@ pub fn evaluate (state: &State, meta: MetaData, mode: Mode) -> f32 {
             // TODO: Ignore T-spin
 
             if let Some(prev) = prev {
-                let d = h[x] - prev;
+                let d = h[x].abs_diff(prev);
                 sum_sq += (d * d) as f32;
             }
 

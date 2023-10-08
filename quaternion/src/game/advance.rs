@@ -1,11 +1,15 @@
+use std::fs::Metadata;
+
 use super::{*, eval::evaluate};
+
+
 
 
 
 impl Move {
 
     /// Determines if move held. Checks if HOLD is the first key in list.
-    fn held (&self) -> bool {
+    pub fn held (&self) -> bool {
         if self.list_len() == 0 { return false }
 
         let mask = Self::MASK << Self::LEN_W;
@@ -17,6 +21,8 @@ impl Move {
 
 
 impl Board {
+
+    /// Places piece onto map. Does not clear
     fn place (&mut self, piece: Piece, mov: &Move) {
         for (dx, dy) in piece.cells(mov.r) {
             let nx = mov.x + dx;
@@ -70,19 +76,23 @@ impl State {
     /// Wrapped by `apply-move(..)` for exported interface.
     /// Used by `make_node(..)` to help calculate attack
     fn apply_move_return_clears (mut self, mov: &Move) -> (Self, u32, bool) {
-        let piece = self.queue.pop_front().expect("Attempted to apply_move() when queue is empty");
-        let hold  = self.hold.expect("Move held but state does not have hold piece.");
 
         // Retains the piece placed. Needed for t-spin detection
         let placed = if mov.held() {
+            if self.hold.is_none () {
+                println!("{self}");
+                println!("-> {:?}", mov);
+            }
+            let hold = self.hold.expect("Move held but state does not have hold piece.");
+
             self.board.place(hold, mov);
 
-            // Swap pieces
-            self.hold = Some(piece);
-            self.queue.push_front(hold);
+            // Put first in queue into hold
+            self.hold = self.queue.pop_front();
 
             hold
         } else {
+            let piece = self.queue.pop_front().expect("Move placed but state's queue was empty.");
             self.board.place(piece, mov);
 
             piece
@@ -108,12 +118,11 @@ impl State {
 
     /// Creates node that will be created from self and the input move.
     /// Applies Move, Calculate evaluation `MetaData` (atk, ds, etc), then evaluate.
-    pub fn make_node (mut self, mov: Move, eval_mode: eval::Mode) -> Node {
+    pub fn apply_move_with_stats (mut self, mov: &Move) -> (Self, MoveStats) {
 
         let (clears, was_tspin) = {
-            let mut clears = 0;
-            let mut is_tspin = false;
-            (self, clears, is_tspin) = self.apply_move_return_clears(&mov);
+            let (n_state, clears, is_tspin) = self.apply_move_return_clears(&mov);
+            self = n_state;
             (clears, is_tspin)
         };
 
@@ -140,14 +149,22 @@ impl State {
             attacks += 10;
         }
 
-        let meta = eval::MetaData {
+        let stats = MoveStats {
             attacks,
             ds: clears as u8,
             tspin: self.b2b != 0,
         };
 
+        (self, stats)
+    }
+
+
+    pub fn make_node (mut self, mov: Move, eval_mode: eval::Mode) -> Node {
+        let (nstate, stats) = self.apply_move_with_stats(&mov);
+        self = nstate;
+
         // Evaluate
-        let eval = evaluate(&self, meta, eval_mode);
+        let eval = evaluate(&self, stats, eval_mode);
 
         Node {
             eval,

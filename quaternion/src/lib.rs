@@ -2,6 +2,11 @@ mod game;
 mod tree;
 mod worker;
 
+// Re-Exports (for driver)
+pub use game::{Piece, Key, State};
+pub use game::sim::SimState;
+pub use worker::BotStats;
+pub use game::MoveStats;
 
 use std::sync::Arc;
 #[cfg(not(target_family = "wasm"))]
@@ -48,16 +53,20 @@ impl Quaternion {
         self.handles.into_iter().for_each(|handle| handle.join().expect("failed to join worker"));
     }
 
-    pub fn solution (&self) -> (game::Move, game::State) {
-        let (node, state) = self.worker.solution().expect("worker.solution() returned Err");
-        (node.get_mv().clone(), state)
+    pub fn solution (&self) -> game::Move {
+        self.worker
+            .solution()
+            .expect("worker.solution() returned Err")
+            .mv
     }
 
-    pub fn advance (&self, state: game::State) {
-        self.worker.advance(&state);
+    /// Exposed interface for bot advancement.
+    /// Takes in a `SimState`, converts it into a `State`, and passes it to the worker.
+    pub fn advance (&self, state: &SimState) {
+        self.worker.advance(&state.state);
     }
 
-    pub fn stats (&self) -> worker::State { 
-        self.worker.state.lock().clone()
+    pub fn stats (&self) -> BotStats { 
+        self.worker.state.lock().stats.clone()
     }
 }

@@ -1,6 +1,5 @@
 use std::time::Instant;
-
-use crate::colors::*;
+use crate::*;
 
 // Tracks: Over time, over iterations
 pub struct Stats {
@@ -69,11 +68,11 @@ impl std::fmt::Display for Stats {
 }
 
 impl Stats {
-    pub fn accumulate (&mut self, state: &quaternion::game::State, bot_state: &quaternion::worker::State) {
+    pub fn accumulate (&mut self, move_stats: &quaternion::MoveStats, bot_stats: &quaternion::BotStats) {
 
-        *self.get("nodes").unwrap() += bot_state.nodes as f64;
+        *self.get("nodes").unwrap() += bot_stats.nodes as f64;
         *self.get("pieces").unwrap() += 1.0;
-        *self.get("attacks").unwrap() += state.props.atk as f64;
+        *self.get("attacks").unwrap() += move_stats.attacks as f64;
 
         self.iters += 1;
     }

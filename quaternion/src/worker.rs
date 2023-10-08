@@ -13,15 +13,20 @@ pub struct Worker {
 
 #[derive(Clone)]
 pub struct State {
-    pub nodes: u64,
     pub node_limit: u64,
-    pub run: bool
+    pub run: bool,
+    pub stats: BotStats,
+}
+
+#[derive(Clone, Default)]
+pub struct BotStats {
+    pub nodes: u64
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            nodes: 0,
+            stats: Default::default(),
             node_limit: 100000,
             run: false
         }
@@ -30,7 +35,7 @@ impl Default for State {
 
 impl State {
     fn should_work(&self) -> bool {
-        self.run && self.nodes < self.node_limit 
+        self.run && self.stats.nodes < self.node_limit 
     }
 }
 
@@ -43,25 +48,45 @@ impl Worker {
         }
     }
 
+    /// Starts worker cycle. Panics if is already running
     pub fn start (&self, state: &mut State) {
+        assert!(state.run == false);
         state.run = true;
         self.blocker.notify_all();
     }
 
+    /// Starts worker cycle. Panics if is not running 
     pub fn stop (&self, state: &mut State) {
+        assert!(state.run == true);
         state.run = false;
         self.blocker.notify_all();
     }
 
-    pub fn solution (&self) -> Result<(Node, game::State), ()> {
+    pub fn solution (&self) -> Result<Node, ()> {
         self.tree.read().solution()
     }
 
+    /// Advance worker into new state.
+    /// Does not affect running/stopping state of the bot.
     pub fn advance (&self, state: &game::State) {
-        self.stop(&mut self.state.lock());
+        // If is running, stop.
+        let was_running = {
+            let state = &mut self.state.lock();
+            if state.run {
+                self.stop(state);
+                true
+            } else { false }
+        };
+
         self.tree.write().advance(state);
-        self.state.lock().nodes = 0;
-        self.start(&mut self.state.lock());
+
+        // Reset Stats
+        self.state.lock().stats = Default::default();
+
+        // If was running, continue.
+        if was_running {
+            self.start(&mut self.state.lock());
+        }
     }
 
     fn work (&self) {
@@ -79,7 +104,7 @@ impl Worker {
         
         let children: Vec<_> = {
             let nodes = gen_children(selection.get_state());
-            self.state.lock().nodes += nodes.len() as u64;
+            self.state.lock().stats.nodes += nodes.len() as u64;
 
             let nodes = prune_children(nodes, &selection);
             nodes

@@ -44,7 +44,6 @@ fn shift_l () {
         r: Rotation::N,
         list: 0,
     };
-    println!("{conflict_table}");
     let mov = mov.shift(1, &conflict_table).unwrap();
     assert_eq!(mov.x, 5);
     assert_eq!(mov.parse_list(), vec![Key::R]);
@@ -187,4 +186,46 @@ fn drop () {
     let mov = mov.drop(&board, piece).unwrap();
     assert_eq!(mov.y, 3);
     assert_eq!(mov.parse_list(), vec![Key::Drop]);
+}
+
+
+
+#[test]
+fn held () {
+    let mut mov = Move::default();
+    assert!(!mov.held());
+
+    mov.add_key(&Key::Hold);
+    assert!(mov.held());
+}
+
+
+#[test]
+fn list_space_limit () {
+    let mut mov = Move::default();
+    for _ in 0..19 {
+        mov.add_key(&Key::L);
+    }
+    assert!(!mov.list_has_space());
+}
+
+
+#[test]
+fn movegen () {
+    let board = &TEST_BOARDS[0]; 
+
+    let state = State {
+        board: board.clone(),
+        queue: vec![Piece::T].into_iter().collect(),
+        b2b: 0,
+        combo: 0,
+        hold: None,
+    };
+
+    let moves = gen_moves(&state);
+
+    for mov in moves {
+        let state = state.clone().apply_move(&mov);
+        println!("{state}");
+    }
 }

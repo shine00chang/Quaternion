@@ -7,7 +7,7 @@ use rand_chacha::ChaCha8Rng;
 use quaternion::game;
 use super::state;
 use super::stats::Stats;
-use crate::colors::*;
+use crate::*;
 
 
 pub fn run (args: crate::Args) {

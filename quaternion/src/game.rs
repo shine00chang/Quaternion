@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 pub mod movegen;
 pub mod advance;
 pub mod eval;
+pub mod sim;
 
 /*
  * Exports Only Move, Keys, Pieces, State, gen_moves(), evaluate()
@@ -17,13 +18,13 @@ pub enum Key {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Piece {
-    L, J, S, Z, T, I, O
+    L, J, S, Z, T, I, O, None
 }
 
 
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Rotation {
+pub enum Rotation {
     N, S, E, W
 }
 
@@ -36,6 +37,17 @@ pub struct Move {
     r: Rotation,
     list: u64,
 }
+
+
+/// Move's metadata. describes statistics of a move after it is applied onto a state.
+/// used for evaluation and simulation.
+#[derive(Default)]
+pub struct MoveStats {
+    pub attacks: u8,
+    pub ds: u8,
+    pub tspin: bool
+}
+
 impl Default for Move {
     fn default() -> Self {
         Self { x: 0, y: 0, r: Rotation::N, list: 0 }
@@ -45,11 +57,12 @@ impl Default for Move {
 
 impl Move {
     const W: u64 = 3;
-    const LEN_W: u64 = 4;
+    const LEN_W: u64 = 5;
     const MASK: u64 = (1<<Self::W) - 1;
     const LIST_CAPACITY: u64 = (64 - Self::LEN_W) / Self::W;
+
     pub fn list_len (&self) -> u64 {
-        self.list & Self::MASK
+        self.list & ((1 << Self::LEN_W) -1)
     }
 
     /// Parses bitset list.
@@ -106,7 +119,7 @@ impl std::fmt::Display for State {
     fn fmt (&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for y in 0..20 {
             for x in 0..10 {
-                let b = (self.board.v[x] & (1 << y)) != 0;
+                let b = (self.board.v[x] & (1 << (19-y))) != 0;
                 write!(f, "{} ", if b { '#' } else { '.' })?;
             }
             print!(" ");
@@ -124,37 +137,5 @@ impl std::fmt::Display for State {
         }
         write!(f, "\n")?;
         Ok(())
-    }
-}
-
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn apply_move_test () {
-        /*
-        let mut state = super::State::new();
-        state.pieces.push_back(tetron::Piece::I);
-        state.pieces.push_back(tetron::Piece::L);
-        state.pieces.push_back(tetron::Piece::Z);
-        state.pieces.push_back(tetron::Piece::S);
-        state.pieces.push_back(tetron::Piece::J);
-        state.pieces.push_back(tetron::Piece::O);
-        state.pieces.push_back(tetron::Piece::T);
-
-        let mut mv = super::Move::new();
-        mv.x = 3;
-        mv.r = 2;
-        mv.hold = true;
-        mv.y = 18;
-
-        state.apply_move(&mv).unwrap();
-
-        println!("{}", state);
-        */
     }
 }

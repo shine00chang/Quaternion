@@ -83,7 +83,7 @@ impl Tree {
     }
     */
 
-    pub fn solution (&self) -> Result<(Node, game::State), ()> {
+    pub fn solution (&self) -> Result<Node, ()> {
         //self.print_best();
 
         // Find child with highest eval.
@@ -110,12 +110,9 @@ impl Tree {
                 .0.lock()
                 .clone()
         };
-
-        // Get solution state
-        let child = child;
-        let state = self.root_state.read().clone().apply_move(&child.mv);
-        Ok((child, state))
+        Ok(child)
     }
+
     
     pub fn advance (&mut self, state: &game::State) {
         // Find child with matching state.
@@ -230,7 +227,12 @@ impl Node {
 pub fn gen_children (state: &game::State) -> Vec<Node> {
     game::movegen::gen_moves(state)
         .into_iter()
-        .map(|mv| state.clone().make_node(mv, game::eval::Mode::Norm))
+        .map(|mov| {
+            if mov.held() {
+                println!("{:?}", mov);
+            }
+            state.clone().make_node(mov, game::eval::Mode::Norm)
+        })
         .collect()
 }
 
@@ -304,31 +306,3 @@ impl Backprop {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn gen_children_test () {
-        /*
-        let mut state = game::State::new();
-        state.pieces.push_back(game::Piece::I);
-        state.pieces.push_back(game::Piece::L);
-        state.pieces.push_back(game::Piece::Z);
-        state.pieces.push_back(game::Piece::S);
-        state.pieces.push_back(game::Piece::J);
-        state.pieces.push_back(game::Piece::O);
-        state.pieces.push_back(game::Piece::T);
-
-        let children = gen_children(&state);
-        for child in children {
-            let mut state = state.clone();
-            let mv = child.mv.clone();
-            state.apply_move(&mv).expect("Failed to apply move at 'gen_children()'");
-
-            println!("{:?}\n", mv.parse_list());
-            println!("{}\n", state);
-        }
-        */
-    }
-}

@@ -13,11 +13,12 @@ pub fn gen_moves (state: &State) -> Vec<Move> {
         .expect("State has no pieces in queue. cannot generate moves.")
         .clone();
 
-    gen_moves_one(&state.board, piece)
+    gen_moves_one(&state.board, piece, false)
         .into_iter()
         .chain(
             if let Some(hold) = state.hold {
-                gen_moves_one(&state.board, hold)
+                println!("genmove for hold");
+                gen_moves_one(&state.board, hold, true)
             } else { vec![] }.into_iter()
         )
         .collect()
@@ -25,7 +26,7 @@ pub fn gen_moves (state: &State) -> Vec<Move> {
 
 /// Returns a list of all possible moves from a board for a single piece.
 /// Wrapped by 'gen_moves(..)' for exported interface.
-fn gen_moves_one (board: &Board, piece: Piece) -> Vec<Move> {
+fn gen_moves_one (board: &Board, piece: Piece, hold: bool) -> Vec<Move> {
     let mut queue: LinkedList<Move> = LinkedList::new();
     let mut set: HashSet<u32> = HashSet::new();
     let mut out: LinkedList<Move> = LinkedList::new();
@@ -50,17 +51,22 @@ fn gen_moves_one (board: &Board, piece: Piece) -> Vec<Move> {
 
     // Add Spawn
     {
-        let spawn = Move {
+        let mut spawn = Move {
             x: 4,
             y: 19,
             r: Rotation::N,
             list: 0,
         };
 
+        if hold {
+            spawn.add_key(&Key::Hold);
+        }
+
         // If spawn conflicts, return no moves. game over.
         if conflict_table.conflicts(&spawn) {
             return vec![];
         }
+
 
         update(&mut queue, &mut set, spawn);
     }
@@ -173,7 +179,6 @@ impl Move {
 
     fn rotate(&self, conflict_table: &ConflictTable, from: Rotation, to: Rotation) -> Option<Move> {
         let kicks = Rotation::kicktable(conflict_table.piece, from, to);
-        println!("{:?}", kicks);
 
         for kick in kicks {
             let nmov = Move {
@@ -182,7 +187,6 @@ impl Move {
                 r: to,
                 ..*self
             };
-            println!("{:?}", nmov);
             if !conflict_table.conflicts(&nmov) {
                 return Some(nmov)
             }
@@ -375,6 +379,7 @@ impl Piece {
             Piece::T => expand_for!(for pair in [(-1, 0), (0, 0), (1, 0), ( 0, 1)] Self::rotate(pair, r)),
             Piece::I => expand_for!(for pair in [(-1, 0), (0, 0), (1, 0), ( 2, 0)] Self::rotate(pair, r)),
             Piece::O => expand_for!(for pair in [( 0, 0), (1, 0), (0, 1), ( 1, 1)] Self::rotate(pair, r)),
+            Piece::None => panic!()
         }
     }
 }
