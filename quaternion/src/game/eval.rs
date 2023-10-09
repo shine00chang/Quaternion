@@ -38,8 +38,8 @@ struct Weights {
 const WEIGHTS_ATK: Weights = Weights {
     hole: -100.0,
     hole_depth: -10.0,
-    h_local_deviation: -5.0,
-    h_global_deviation: -4.0,
+    h_local_deviation: -3.0,
+    h_global_deviation: -2.0,
     well_v: 1.0,
     well_parity: -3.0,
     well_odd_par: -30.0,
@@ -47,10 +47,10 @@ const WEIGHTS_ATK: Weights = Weights {
     tspin_flat_bonus: 40.0,
     tspin_dist: -2.0,
     tspin_completeness: 4.0,
-    average_h : -1.0,
+    average_h : 0.0,
     sum_attack: 25.0,
     sum_downstack: 15.0,
-    attack: 20.0,
+    attack: 50.0,
     downstack: 10.0,
     eff: 100.0,
 };
@@ -71,7 +71,7 @@ const WEIGHTS_DS: Weights = Weights {
     sum_attack: 0.0,
     sum_downstack: 35.0,
     attack: 0.0,
-    downstack: 30.0,
+    downstack: 50.0,
     eff: 0.0,
 };
 const FACTORS_ATK: Factors = Factors {
@@ -85,23 +85,19 @@ const FACTORS_DS: Factors = Factors {
 
 const DS_HEIGHT_THRESHOLD: f32 = 14.0;
 const DS_HOLE_THRESHOLD  : u32 = 2;
-const DS_MODE_PENALTY    : f32 = -1000.0;
+const DS_MODE_PENALTY    : f32 = -400.0;
 const WELL_PLACEMENT_F   : f32 = 70.0;
-const WELL_PLACEMENT     : [f32; 10] = [-1.0, -1.0, 0.8, 1.2, 1.0, 1.0, 1.2, 0.8, -1.0, -1.0];
+const WELL_PLACEMENT     : [f32; 10] = [-1.0, -1.0, 0.2, 1.2, 1.0, 1.0, 1.2, 0.2, -1.0, -1.0];
 
 
 /// Heuristic Evaluation function
 pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
-
-    const FW: usize = 10;
-    const FH: usize = 20;
-
     let mut score = 0.0;
     let b = &state.board;
 
     // Calc heights
     let h = b.v.map(|col| 32-col.leading_zeros());
-    let avg_h = h.iter().sum::<u32>() as f32 / FW as f32;
+    let avg_h = h.iter().sum::<u32>() as f32 / 10.0;
 
     let (holes, depth_sum_sq): (Vec<_>, Vec<_>) = b.v
         .clone()
@@ -136,7 +132,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
     let (weights, factors) = {
         match mode {
             Mode::Norm =>
-                if  FH as f32 - avg_h >= DS_HEIGHT_THRESHOLD || holes >= DS_HOLE_THRESHOLD {
+                if  avg_h >= DS_HEIGHT_THRESHOLD || holes >= DS_HOLE_THRESHOLD {
                     score += DS_MODE_PENALTY;
                     (WEIGHTS_DS, FACTORS_DS)
                 } else {
@@ -169,7 +165,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
 
     // Remove well height from average height
     let avg_h = if let Some(well) = well {
-        (avg_h * FW as f32 - h[well.0] as f32) / (FW - 1) as f32
+        (avg_h * 10.0 - h[well.0] as f32) / 9.0 
     } else { avg_h };
 
     // Score by avg_h height
@@ -212,7 +208,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
         let mut sum_sq: f32 = 0.0;
         let mut prev = None;
 
-        for x in 0..FW {
+        for x in 0..10 {
             // Score well by height (not clear value)
             if x == well.unwrap_or_else(|| (100, 0.0)).0 { continue }
             
@@ -265,7 +261,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
     }
 
     // clear and attack
-    score += (meta.attacks as i8 - meta.ds as i8) as f32 * weights.eff;
+    score += (meta.attacks as i32 - meta.ds as i32) as f32 * weights.eff;
 
     score += meta.attacks as f32 * weights.attack;
     score += meta.ds as f32 * weights.downstack;

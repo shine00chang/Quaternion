@@ -229,3 +229,5 @@ fn movegen () {
         println!("{state}");
     }
 }
+
+

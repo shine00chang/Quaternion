@@ -86,7 +86,7 @@ impl Move {
 }
 
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Board {
     v: [u32; 10]
 }
@@ -94,7 +94,7 @@ struct Board {
 
 impl std::fmt::Display for Board {
     fn fmt (&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for y in 0..20 {
+        for y in (0..20).rev() {
             for x in 0..10 {
                 let b = (self.v[x] & (1 << y)) != 0;
                 write!(f, "{} ", if b { '#' } else { '.' })?;

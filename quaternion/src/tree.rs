@@ -110,6 +110,11 @@ impl Tree {
                 .0.lock()
                 .clone()
         };
+
+        let state = self.root_state.read();
+        let state = state.clone().apply_move(&child.mv);
+        println!("{state}");
+
         Ok(child)
     }
 

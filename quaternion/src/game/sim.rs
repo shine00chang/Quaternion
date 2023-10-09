@@ -132,10 +132,8 @@ impl SimState {
         for y in 0..20 {
             if self.v[y].iter().fold(true, |a, cell| a && *cell != Piece::None) {
                 clears += 1;
-            }
-            if y + clears < 20 {
-                self.v[y] = self.v[y+clears];
-            } else {
+            } else if clears != 0 {
+                self.v[y-clears] = self.v[y];
                 self.v[y] = [Piece::None; 10];
             }
         }

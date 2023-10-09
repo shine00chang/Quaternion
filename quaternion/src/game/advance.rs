@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::fs::Metadata;
 
 use super::{*, eval::evaluate};
@@ -36,27 +39,26 @@ impl Board {
     fn clear (&mut self) -> u32 {
 
         // make mask
-        let mask = self.v.iter()
+        let mut mask = self.v.iter()
             .fold(!0, |a, i| a & i);
+        let clears = mask.count_ones();
 
         // For each i where mask[i] == 1 in decending order, shift the bitseg[i+1..32] left by one, and add it with
         // the bitseg[0..i]. The sum will be the new column.
-        for x in 0..10 {
-            for y in (0..20).rev() {
-                if mask & 1<<y == 0 { continue }
-
-                let col = self.v[x];
+        while mask != 0 {
+            let y = mask.trailing_zeros();
+            for col in self.v.iter_mut() {
                 let bmask = (1<<y)-1;
-                let tmask = !0 ^ bmask;
-                let bot = col & bmask;
-                let top = col & tmask;
-                let col = bot + (top >> 1);
-
-                self.v[x] = col;
+                let tmask = (!0 ^ bmask) - (1 << y);
+                let bot = *col & bmask;
+                let top = *col & tmask;
+                *col = bot + (top >> 1);
             }
+            mask -= 1 << y;
+            mask >>= 1;
         }
 
-        mask.count_ones()
+        clears
     }
 
     // Determines if a move is a tspin by 3-corner rule.
