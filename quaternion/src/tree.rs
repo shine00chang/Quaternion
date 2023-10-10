@@ -1,5 +1,6 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
+use rand::Rng;
 use super::game;
 
 const CUTOFF_F: f32 = 0.2;
@@ -192,31 +193,27 @@ impl Node {
 
             self.expansions += 1;
 
-            /*
-            let mut rng = rand::thread_rng();
-            let i: usize = (rng.gen::<f64>() * candidates.len() as f64) as usize;
-            SelectionResult::Continue(candidates[i].clone())
-            */ 
+            // let i = rand::thread_rng().gen_range(0..candidates.len()) as usize;
+            // SelectionResult::Continue(candidates[i].clone())
 
+            
             let out = candidates.iter().min_by_key(|c| c.lock().expansions).unwrap();
             SelectionResult::Continue((*out).clone())
+            
         }
     }
 
     pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
-        // TODO: make backprop
         let backprop = {
-            let evals: Vec<_> = 
-                children
-                    .iter()
-                    .map(|c|  c.lock().eval)
-                    .collect();
+            let evals = children
+                .iter()
+                .map(|c|  c.lock().eval)
+                .collect::<Vec<_>>();
 
-            let max_eval = 
-                *evals
-                    .iter()
-                    .max_by(|a, b| a.partial_cmp(&b).unwrap())
-                    .unwrap_or(&-10000.0);
+            let max_eval = *evals
+                .iter()
+                .max_by(|a, b| a.partial_cmp(&b).unwrap())
+                .unwrap_or(&-10000.0);
 
             self.eval = max_eval;
             Backprop { score: max_eval }
@@ -305,8 +302,7 @@ pub struct Backprop {
 
 impl Backprop {
     pub fn apply_to (&self, node: &mut Node) {
-        // TODO:
-        node.eval = self.score.max(node.eval);
+        node.eval = self.score;
     }
 }
 

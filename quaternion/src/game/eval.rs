@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use crate::game::*;
 
 
@@ -23,9 +26,8 @@ struct Weights {
     well_parity: f32,
     well_odd_par: f32,
     well_flat_parity: f32,
-    tspin_flat_bonus: f32,
-    tspin_dist: f32,
-    tspin_completeness: f32,
+    tspin_bonus: f32,
+    tspin_score: f32,
     average_h: f32,
     sum_attack: f32,
     sum_downstack: f32,
@@ -35,8 +37,9 @@ struct Weights {
 } 
 
 
+/*
 const WEIGHTS_ATK: Weights = Weights {
-    hole: -100.0,
+    hole: -40.0,
     hole_depth: -10.0,
     h_local_deviation: -3.0,
     h_global_deviation: -2.0,
@@ -54,19 +57,37 @@ const WEIGHTS_ATK: Weights = Weights {
     downstack: 10.0,
     eff: 100.0,
 };
+*/
+const WEIGHTS_ATK: Weights = Weights {
+    hole: -150.0,
+    hole_depth: 0.0,
+    h_local_deviation: -15.0,
+    h_global_deviation: -5.0,
+    well_v: 0.0,
+    well_parity: 0.0,
+    well_odd_par: 0.0,
+    well_flat_parity: 0.0,
+    tspin_bonus: 00.0,
+    tspin_score: 15.0,
+    average_h : 1.0,
+    sum_attack: 0.0,
+    sum_downstack: 0.0,
+    attack: 40.0,
+    downstack: 10.0,
+    eff: 100.0,
+};
 
 const WEIGHTS_DS: Weights = Weights {
     hole: -150.0,
-    hole_depth: -20.0,
+    hole_depth: 0.0,
     h_local_deviation: -10.0,
     h_global_deviation: -8.0,
     well_v: 0.0,
     well_parity: 0.0,
     well_odd_par: 0.0,
     well_flat_parity: 0.0,
-    tspin_flat_bonus: -150.0, // Same as hole
-    tspin_dist: 0.0,
-    tspin_completeness: 0.0,
+    tspin_bonus: -150.0, // Same as hole
+    tspin_score: 0.0,
     average_h : -20.0,
     sum_attack: 0.0,
     sum_downstack: 35.0,
@@ -87,13 +108,112 @@ const DS_HEIGHT_THRESHOLD: f32 = 14.0;
 const DS_HOLE_THRESHOLD  : u32 = 2;
 const DS_MODE_PENALTY    : f32 = -400.0;
 const WELL_PLACEMENT_F   : f32 = 70.0;
-const WELL_PLACEMENT     : [f32; 10] = [-1.0, -1.0, 0.2, 1.2, 1.0, 1.0, 1.2, 0.2, -1.0, -1.0];
+const WELL_PLACEMENT     : [f32; 10] = [-0.5, -1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, -1.0, -0.5];
+//const WELL_PLACEMENT     : [f32; 10] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
 
+
+struct Tspin {
+    x: usize,
+    overhang: bool,
+    rows: u8,
+}
+
+#[derive(Default)]
+struct Tspins {
+    vx: Vec<usize>,
+    pub overhangs: u8,
+    pub score: u8
+}
+
+impl Tspins {
+    fn count (&self) -> u32 {
+        self.vx.len() as u32
+    }
+
+    fn contains (&self, x: usize) -> bool {
+        self.vx.contains(&x)
+    }
+
+    fn find (board: &Board) -> Self {
+        let mut out = Tspins::default();
+
+        for y in 0..20 {
+            for x in 0..10 {
+                if let Some(tspin) = Self::is_tspin(&board, x, y) {
+                    out.vx.push(tspin.x);
+                    if tspin.overhang {
+                        out.overhangs += 1;
+                    }
+                    out.score += tspin.rows + if tspin.overhang { 1 } else { 0 };
+                }
+            }
+        }
+
+        out
+    }
+
+    fn is_tspin (board: &Board, x: i32, y: i32) -> Option<Tspin> {
+        if x <= 0 || x >= 9 || y == 0 {
+            return None;
+        }
+
+        let prelim = 
+            !board.occupied(x, y) &&
+            !board.occupied(x, y-1) &&
+            !board.occupied(x, y+1) &&
+            !board.occupied(x-1, y) &&
+            !board.occupied(x+1, y) &&
+            (!board.occupied(x-1, y+1) || !board.occupied(x+1, y+1)) &&
+            board.occupied(x-1, y-1) &&
+            board.occupied(x+1, y-1);
+
+        if !prelim { 
+            return None;
+        }
+
+        let overhang = board.occupied(x-1, y+1) ^ board.occupied(x+1, y+1);
+
+        let x = x as usize;
+        let row1 = board.v
+            .iter()
+            .enumerate()
+            .fold(true, |a, (i, col)| 
+                if i >= x-1 && i <= x+1 {
+                    a
+                } else {
+                    a && (col & 1 << y != 0)
+                }
+            );
+        let row2 = board.v
+            .iter()
+            .enumerate()
+            .fold(true, |a, (i, col)| 
+                if i == x {
+                    a
+                } else {
+                    a && (col & 1 << (y-1) != 0)
+                }
+            );
+
+        if !row1 && !row2 {
+            return None
+        }
+
+        Some( Tspin { 
+            x,
+            overhang,
+            rows: if row1 { 1 } else { 0 } + if row2 { 1 } else { 0 },
+        } )
+    }
+}
 
 /// Heuristic Evaluation function
 pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
     let mut score = 0.0;
     let b = &state.board;
+
+    // Find T-spin
+    let tspins = Tspins::find(&state.board);
 
     // Calc heights
     let h = b.v.map(|col| 32-col.leading_zeros());
@@ -104,6 +224,10 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
         .into_iter()
         .enumerate()
         .map(|(i, mut col)| {
+            // Ignore tspins
+            if tspins.contains(i) {
+                return (0, 0)
+            }
             let mut holes = 0;
             let mut depth = 0;
 
@@ -121,9 +245,8 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
         .unzip();
 
     let depth_sum_sq = depth_sum_sq.iter().sum::<u32>();
-    let holes = holes.iter().sum::<u32>();
-
-    // TODO: Find T-spin hole
+    let holes = holes.iter().sum::<i32>() - tspins.overhangs as i32;
+    let holes = holes.max(0) as u32;
 
     // Select weights
     // Will use DS if
@@ -142,6 +265,13 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             Mode::Attack => (WEIGHTS_ATK, FACTORS_ATK),
         }
     };
+
+    // Score by Tspins
+    #[cfg(test)]
+    println!("tspins.count() = {}", tspins.count());
+
+    score += tspins.count() as f32 * weights.tspin_bonus;
+    score += tspins.score as f32 * weights.tspin_score;
 
     // Score by holes & depth (split from calculation because weight selection requires hole info)
     score += holes as f32 * weights.hole;
@@ -181,7 +311,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             .iter()
             .enumerate()
             .map(|(x, h)| {
-                // If x == well, ignore
+                // If well, ignore
                 if x == well.unwrap_or_else(|| (100, 0.0)).0 {
                     0.0
                 } else {
@@ -191,14 +321,8 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             })
             .sum();
 
-        // If tspin, compensate w/ [2, 1, 0]
-        // TODO: T-spin compensation
-        /*
-        if tspin.is_some() {
-            dev_log!("t-spin compensation: {}", 5.0 * weights.h_global_deviation);
-            score -= 5.0 * weights.h_global_deviation;
-        }
-        */
+        // T-spin compensation
+        score -= tspins.count() as f32 * 5.0 * weights.h_global_deviation;
 
         score += sum_sq * weights.h_global_deviation;
     }
@@ -212,7 +336,8 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             // Score well by height (not clear value)
             if x == well.unwrap_or_else(|| (100, 0.0)).0 { continue }
             
-            // TODO: Ignore T-spin
+            // Ignore T-spin
+            if tspins.contains(x) { continue }
 
             if let Some(prev) = prev {
                 let d = h[x].abs_diff(prev);

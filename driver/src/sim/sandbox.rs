@@ -41,6 +41,7 @@ pub fn run (args: crate::Args) {
 
         // Render
         println!("{state}");
+        println!("{:?}", move_stats);
     }
     bot.stop();
     println!("{}", stats);

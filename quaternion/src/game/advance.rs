@@ -60,16 +60,18 @@ impl Board {
     // Determines if a move is a tspin by 3-corner rule. Assumes the piece is T.
     // Precondition: The move is not clear()'ed yet
     fn is_tspin (&self, mov: &Move) -> bool {
+        let x = mov.x as i32;
+        let y = mov.y as i32;
         let corners = 
-            if self.occupied(mov.x -1, mov.y -1) { 1 } else { 0 } +
-            if self.occupied(mov.x -1, mov.y +1) { 1 } else { 0 } +
-            if self.occupied(mov.x +1, mov.y +1) { 1 } else { 0 } +
-            if self.occupied(mov.x +1, mov.y -1) { 1 } else { 0 };
+            if self.occupied(x -1, y -1) { 1 } else { 0 } +
+            if self.occupied(x -1, y +1) { 1 } else { 0 } +
+            if self.occupied(x +1, y +1) { 1 } else { 0 } +
+            if self.occupied(x +1, y -1) { 1 } else { 0 };
 
         corners >= 3
     }
 
-    fn occupied (&self, x: i8, y: i8) -> bool {
+    pub fn occupied (&self, x: i32, y: i32) -> bool {
         if x < 0 || x > 9 || y < 0 {
             true 
         } else { 

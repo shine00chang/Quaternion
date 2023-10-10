@@ -41,7 +41,8 @@ impl std::fmt::Display for SimState {
             match y {
                 0 => write!(f, "b2b:   {BLD}{:>2}{RST}", self.state.b2b)?,
                 1 => write!(f, "combo: {BLD}{:>2}{RST}", self.state.combo)?,
-                3 => write!(f, "hold:  {BLD}{:?}{RST}", self.state.hold)?,
+                3 => write!(f, "hold:  {BLD}{}{RST}",
+                            if let Some(hold) = self.state.hold { format!("{:?}", hold) } else { "none".to_owned() })?,
                 4 => write!(f, "queue:")?,
                 5..=9 => if self.state.queue.len() > y-5 {
                     write!(f, "{BLD}{:?}{RST}", self.state.queue[y-5])?

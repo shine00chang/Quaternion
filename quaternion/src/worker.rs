@@ -27,7 +27,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             stats: Default::default(),
-            node_limit: 100000,
+            node_limit: 1000000,
             run: false
         }
     }

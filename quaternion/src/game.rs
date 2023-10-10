@@ -41,7 +41,7 @@ pub struct Move {
 
 /// Move's metadata. describes statistics of a move after it is applied onto a state.
 /// used for evaluation and simulation.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MoveStats {
     pub attacks: u8,
     pub ds: u8,
@@ -170,8 +170,9 @@ impl State {
             }
 
             // Hold line
-            if i == 2 {
+            if i == 3 {
                 let ch = line.get(line.len()-1..).unwrap();
+                println!("hold: {ch}");
                 hold = match ch {
                     "L" => Some(Piece::L),
                     "J" => Some(Piece::J),
@@ -222,7 +223,8 @@ impl std::fmt::Display for State {
             match y {
                 0 => write!(f, "b2b:   {:>2}", self.b2b)?,
                 1 => write!(f, "combo: {:>2}", self.combo)?,
-                3 => write!(f, "hold:  {:?}", self.hold)?,
+                3 => write!(f, "hold:  {}",
+                            if let Some(hold) = self.hold { format!("{:?}", hold) } else { "none".to_owned() })?,
                 4 => write!(f, "queue:")?,
                 5..=9 => if self.queue.len() > y-5 {
                     write!(f, "{:?}", self.queue[y-5])?
