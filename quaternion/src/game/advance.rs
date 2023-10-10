@@ -90,16 +90,17 @@ impl State {
 
         // Retains the piece placed. Needed for t-spin detection
         let placed = if mov.held() {
-            if self.hold.is_none () {
-                println!("{self}");
-                println!("-> {:?}", mov);
-            }
-            let hold = self.hold.expect("Move held but state does not have hold piece.");
 
+            // Get piece, Set hold, Update queue
+            let hold = if let Some(hold) = self.hold {
+                self.hold = self.queue.pop_front();
+                hold
+            } else {
+                self.hold = Some( self.queue.pop_front().expect("Held without hold, but queue is empty") );
+                self.queue.pop_front().expect("Held without hold, but queue only has 1 element")
+            };
+            
             self.board.place(hold, mov);
-
-            // Put first in queue into hold
-            self.hold = self.queue.pop_front();
 
             hold
         } else {

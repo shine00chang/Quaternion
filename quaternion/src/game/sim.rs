@@ -93,6 +93,21 @@ impl SimState {
         }
     }
 
+    pub fn equals (&self, s: &str) -> bool {
+        let s = s.trim();
+
+        let board = Board::from_str(s);
+
+        for x in 0..10 {
+            for y in 0..20 {
+                if board.v[x] & 1 << y != 0 && self.v[y][x] == Piece::None {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /// Draws from bag, populates piece queue. Auto re-fill of bag.
     pub fn draw (&mut self) {
         while self.state.queue.len() < 6 {
@@ -134,16 +149,14 @@ impl SimState {
     /// Advances state into next given move.
     pub fn advance (mut self, mov: &Move) -> (Self, MoveStats) {
         let placed = if mov.held() {
-            let hold = self.state.hold;
-            if self.state.hold.is_none() {
-                panic!("SimState move held but state does not have hold piece.");
+            // Get piece, Set hold, Update queue
+            if let Some(hold) = self.state.hold {
+                hold
+            } else {
+                *self.state.queue.get(1).expect("Sim State: Held without hold, but queue only has 1 element")
             }
-
-            self.state.hold = self.state.queue.pop_front();
-
-            hold.unwrap()
         } else {
-            self.state.queue.front().expect("SimState move placed but state's queue was empty.").clone()
+            *self.state.queue.front().expect("Sim State: Move placed but state's queue was empty.")
         };
 
         // Places on colored V

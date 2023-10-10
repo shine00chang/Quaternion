@@ -159,9 +159,7 @@ impl State {
         for (i, line) in s.lines().enumerate() {
             // B2B line
             if i == 0 { 
-                println!("{line}");
                 let last = line.trim().split(' ').last().unwrap();
-                println!("{last}");
                 b2b = last.parse().expect("could not parse b2b into number");
             }
 
@@ -220,7 +218,7 @@ impl std::fmt::Display for State {
                 let b = (self.board.v[x] & (1 << (19-y))) != 0;
                 write!(f, "{} ", if b { '#' } else { '.' })?;
             }
-            print!(" ");
+            write!(f, " ")?;
             match y {
                 0 => write!(f, "b2b:   {:>2}", self.b2b)?,
                 1 => write!(f, "combo: {:>2}", self.combo)?,

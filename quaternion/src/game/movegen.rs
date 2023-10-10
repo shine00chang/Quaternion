@@ -17,9 +17,10 @@ pub fn gen_moves (state: &State) -> Vec<Move> {
         .into_iter()
         .chain(
             if let Some(hold) = state.hold {
-                println!("genmove for hold");
                 gen_moves_one(&state.board, hold, true)
-            } else { vec![] }.into_iter()
+            } else if let Some(&hold) = state.queue.get(1) {
+                gen_moves_one(&state.board, hold, true)
+            }  else { vec![] }.into_iter()
         )
         .collect()
 }

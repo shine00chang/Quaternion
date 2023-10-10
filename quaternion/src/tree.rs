@@ -111,9 +111,13 @@ impl Tree {
                 .clone()
         };
 
+
+        // Debug: print state.
+        // /*
         let state = self.root_state.read();
         let state = state.clone().apply_move(&child.mv);
         println!("{state}");
+        // */
 
         Ok(child)
     }
@@ -232,12 +236,7 @@ impl Node {
 pub fn gen_children (state: &game::State) -> Vec<Node> {
     game::movegen::gen_moves(state)
         .into_iter()
-        .map(|mov| {
-            if mov.held() {
-                println!("{:?}", mov);
-            }
-            state.clone().make_node(mov, game::eval::Mode::Norm)
-        })
+        .map(|mov| state.clone().make_node(mov, game::eval::Mode::Norm))
         .collect()
 }
 
