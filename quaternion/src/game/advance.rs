@@ -1,11 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::fs::Metadata;
-
 use super::{*, eval::evaluate};
-
-
 
 
 
@@ -61,11 +57,24 @@ impl Board {
         clears
     }
 
-    // Determines if a move is a tspin by 3-corner rule.
+    // Determines if a move is a tspin by 3-corner rule. Assumes the piece is T.
     // Precondition: The move is not clear()'ed yet
-    // TODO: 
     fn is_tspin (&self, mov: &Move) -> bool {
-        false
+        let corners = 
+            if self.occupied(mov.x -1, mov.y -1) { 1 } else { 0 } +
+            if self.occupied(mov.x -1, mov.y +1) { 1 } else { 0 } +
+            if self.occupied(mov.x +1, mov.y +1) { 1 } else { 0 } +
+            if self.occupied(mov.x +1, mov.y -1) { 1 } else { 0 };
+
+        corners >= 3
+    }
+
+    fn occupied (&self, x: i8, y: i8) -> bool {
+        if x < 0 || x > 9 || y < 0 {
+            true 
+        } else { 
+            self.v[x as usize] & 1 << y != 0 
+        }
     }
 }
 
@@ -133,7 +142,7 @@ impl State {
         let mut attacks = if clears == 0 { 
             0 
         // case: basic clears 
-        } else if !was_tspin {
+        } else if !was_tspin && clears != 4 {
             match clears {
                 0 => 0,
                 1 => [0, 0, 1, 1, 1, 1, 2, 2, 2, 2][self.combo as usize],
@@ -141,9 +150,20 @@ impl State {
                 3 => [2, 2, 3, 3, 4, 4, 5, 5, 6, 6][self.combo as usize],
                 _ => 0
             }
-        // case: tspin
+        // case: tspin or tetris
         } else  {
-            B2B_TABLE[self.b2b as usize][clears as usize][self.combo as usize] as u8
+            // TODO: Attack Table
+            /*
+            let index = if clears == 4 { 0 } else { clears };
+            B2B_TABLE[self.b2b as usize][index as usize][self.combo as usize] as u8
+            */
+            match clears {
+                1 => 2,
+                2 => 4,
+                3 => 6,
+                4 => 4,
+                _ => unreachable!()
+            }
         };
 
         // Perfect clear

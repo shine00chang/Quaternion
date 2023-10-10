@@ -13,7 +13,6 @@ edition = "2021"
 name = "quaternion"
 
 [dependencies]
-tetron = { path = "../../tetron/tetron" }
 rand = "0.8.3"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

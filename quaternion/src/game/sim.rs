@@ -66,6 +66,33 @@ impl SimState {
         out.draw();
         out
     }
+
+    /// Creates SimState from textual representation.
+    pub fn from_str (s: &str) -> Self {
+        let s = s.trim();
+
+        let state = State::from_str(s);
+        let bag = vec![Piece::J, Piece::L, Piece::S, Piece::Z, Piece::T, Piece::I, Piece::O]
+            .into_iter()
+            .filter(|piece| !state.queue.contains(piece))
+            .collect();
+        let mut v = [[Piece::None; 10]; 20];
+        
+        for x in 0..10 {
+            for y in 0..20 {
+                if state.board.v[x] & 1 << y != 0 {
+                    v[y][x] = Piece::O;
+                }
+            }
+        }
+
+        Self {
+            state,
+            v,
+            bag,
+        }
+    }
+
     /// Draws from bag, populates piece queue. Auto re-fill of bag.
     pub fn draw (&mut self) {
         while self.state.queue.len() < 6 {

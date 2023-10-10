@@ -306,7 +306,7 @@ pub struct Backprop {
 
 impl Backprop {
     pub fn apply_to (&self, node: &mut Node) {
-        // TODO
+        // TODO:
         node.eval = self.score.max(node.eval);
     }
 }

@@ -97,6 +97,8 @@ fn gen_moves_one (board: &Board, piece: Piece, hold: bool) -> Vec<Move> {
 }
 
 impl Board {
+
+
     // Returns the distance of a given point to the floor.
     // i.e. how many units to go down till you hit the stack.
     fn distance_to_floor (&self, x: i8, y: i8) -> i8 {
