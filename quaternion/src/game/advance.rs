@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests;
 
-use super::{*, eval::evaluate};
-
+use super::*;
+use crate::tree::Evaluation;
 
 
 impl Move {
@@ -68,7 +68,8 @@ impl Board {
             if self.occupied(x +1, y +1) { 1 } else { 0 } +
             if self.occupied(x +1, y -1) { 1 } else { 0 };
 
-        corners >= 3
+        // three corners + last input was rotation
+        corners >= 3 && matches!(mov.parse_list().last().unwrap(), Key::CCW | Key::CW)
     }
 
     pub fn occupied (&self, x: i32, y: i32) -> bool {
@@ -135,7 +136,13 @@ impl State {
     pub fn apply_move_with_stats (mut self, mov: &Move) -> (Self, MoveStats) {
 
         let (clears, was_tspin) = {
-            let (n_state, clears, is_tspin) = self.apply_move_return_clears(&mov);
+            let (n_state, clears, is_tspin) = self.clone().apply_move_return_clears(&mov);
+            // if is_tspin {
+            //     println!("==tspin found");
+            //     println!("{self}");
+            //     println!("{n_state}");
+            // }
+
             self = n_state;
             (clears, is_tspin)
         };
@@ -189,7 +196,7 @@ impl State {
         self = nstate;
 
         // Evaluate
-        let eval = evaluate(&self, stats, eval_mode);
+        let eval = Evaluation::new(eval::evaluate(&self, stats, eval_mode));
 
         Node {
             eval,

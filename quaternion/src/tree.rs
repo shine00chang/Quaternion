@@ -1,7 +1,7 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
-use rand::Rng;
 use super::game;
+use rand::Rng;
 
 const CUTOFF_F: f32 = 0.2;
 
@@ -46,7 +46,6 @@ impl Tree {
         Some(Selection::new(list, state))
     }
 
-    /*
     fn print_best (&self) {
         let (mut mutex_node, mut state) = {
             let state = self.root_state.read();
@@ -63,16 +62,19 @@ impl Tree {
                     Ok(node.children
                         .iter()
                         .fold((Arc::new(Mutex::new(Node::default())), f32::MIN), |a, n| {
-                            let eval = n.lock().eval;
-                            if eval > a.1 { (n.clone(), eval) } 
+                            let eval = &n.lock().eval;
+                            if eval.get() > a.1 { (n.clone(), eval.get()) } 
                             else { a }
-                        }).0)
+                        })
+                        .0)
                 };
 
             if let Ok(next) = best {
                 drop(node);
                 let child = next.lock();
-                state.apply_move(child.get_mv()).expect("Could not apply move");
+                let mut stats = Default::default();
+                (state, stats) = state.apply_move_with_stats(child.get_mv());
+                println!("{:?}\t{:?}\t{:?}", child.mv, child.eval, stats);
                 drop(child);
 
                 mutex_node = next;
@@ -82,10 +84,9 @@ impl Tree {
         }
         println!("best:\n{}", state);
     }
-    */
 
     pub fn solution (&self) -> Result<Node, ()> {
-        //self.print_best();
+        self.print_best();
 
         // Find child with highest eval.
         let child = {
@@ -99,11 +100,11 @@ impl Tree {
             root.children
                 .iter()
                 .fold(None, |a, n| -> Option<(_, f32)> {
-                    let eval = n.lock().eval;
+                    let eval = &n.lock().eval;
                     match a { 
-                        None => Some((n.clone(), eval)),
+                        None => Some((n.clone(), eval.get())),
                         Some(a) =>
-                            if eval > a.1 { Some((n.clone(), eval)) } 
+                            if eval.get() > a.1 { Some((n.clone(), eval.get())) } 
                             else { Some(a) }
                     }
                 })
@@ -114,11 +115,11 @@ impl Tree {
 
 
         // Debug: print state.
-        // /*
+        /*
         let state = self.root_state.read();
         let state = state.clone().apply_move(&child.mv);
         println!("{state}");
-        // */
+        */
 
         Ok(child)
     }
@@ -169,7 +170,47 @@ enum SelectionResult {
     Leaf,
 }
 
-pub type Evaluation = f32;
+
+#[derive(Debug, Clone, Default)]
+pub struct Evaluation {
+    present: f32,
+    future: Option<f32>
+}
+impl Evaluation {
+    pub fn new (score: f32) -> Self {
+        Evaluation {
+            present: score, 
+            future: None 
+        }
+    }
+    pub fn apply(&mut self, backprop: &Backprop) {
+        if let Some(future) = &mut self.future {
+            *future = (*future).max(backprop.score);
+        } else {
+            self.future = Some(backprop.score);
+        }
+    }
+
+    const INHERITANCE_F: f32 = 0.3;
+    fn get(&self) -> f32 {
+        if let Some(future) = self.future {
+            self.present * (1.0 - Self::INHERITANCE_F) + future * Self::INHERITANCE_F
+        } else {
+            self.present
+        }
+    }
+}
+impl PartialEq for Evaluation {
+    fn eq(&self, other: &Self) -> bool {
+        self.get() == other.get()
+    }
+}
+impl PartialOrd for Evaluation {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.get().partial_cmp(&other.get())
+    }
+}
+
 
 #[derive(Debug, Clone, Default)]
 pub struct Node {
@@ -205,18 +246,14 @@ impl Node {
 
     pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
         let backprop = {
-            let evals = children
+            let max_eval = children
                 .iter()
-                .map(|c|  c.lock().eval)
-                .collect::<Vec<_>>();
-
-            let max_eval = *evals
-                .iter()
+                .map(|c| c.lock().eval.clone())
                 .max_by(|a, b| a.partial_cmp(&b).unwrap())
-                .unwrap_or(&-10000.0);
+                .unwrap()
+                .clone();
 
-            self.eval = max_eval;
-            Backprop { score: max_eval }
+            Backprop { score: max_eval.get() }
         };
 
         self.children = children;
@@ -239,15 +276,12 @@ pub fn gen_children (state: &game::State) -> Vec<Node> {
 
 // Prune / Apply Cutoff
 pub fn prune_children (mut nodes: Vec<Node>, selection: &Selection) -> Vec<Node> {
-    nodes
-        .sort_by(|a, b| {
-            b.eval.total_cmp(&a.eval)
-        });
+    nodes.sort_by(|a, b| b.eval.partial_cmp(&a.eval).unwrap());
     let n = nodes.len();
     let cutoff_index = { 
         let parent_eval = selection.get_leaf().eval;
         let mut i = 0;
-        while i < n && nodes[i].eval > CUTOFF_F * parent_eval { i += 1; }
+        while i < n && nodes[i].eval.present > CUTOFF_F * parent_eval.get() { i += 1; }
         i.max(20)
     };
     nodes
@@ -290,8 +324,8 @@ impl Selection {
     // Applys backpropagation update to nodes selected for the relavent expansion.
     // Since self.list is in decending order, applies it in reverse. 
     pub fn backprop(&self, backprop: Backprop) {
-        for node in self.list[0..self.list.len()-1].iter().rev() {
-            backprop.apply_to(&mut node.lock());
+        for node in self.list.iter().rev() {
+            node.lock().eval.apply(&backprop);
         }
     }
 }
@@ -299,10 +333,3 @@ impl Selection {
 pub struct Backprop {
     score: f32,
 }
-
-impl Backprop {
-    pub fn apply_to (&self, node: &mut Node) {
-        node.eval = self.score;
-    }
-}
-

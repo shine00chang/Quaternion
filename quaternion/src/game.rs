@@ -172,7 +172,6 @@ impl State {
             // Hold line
             if i == 3 {
                 let ch = line.get(line.len()-1..).unwrap();
-                println!("hold: {ch}");
                 hold = match ch {
                     "L" => Some(Piece::L),
                     "J" => Some(Piece::J),

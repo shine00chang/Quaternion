@@ -16,7 +16,6 @@ struct Factors {
     well_threshold: f32,
 }
 
-
 struct Weights {
     hole: f32,
     hole_depth: f32,
@@ -60,37 +59,37 @@ const WEIGHTS_ATK: Weights = Weights {
 */
 const WEIGHTS_ATK: Weights = Weights {
     hole: -150.0,
-    hole_depth: 0.0,
-    h_local_deviation: -15.0,
+    hole_depth: -20.0,
+    h_local_deviation: -6.0,
     h_global_deviation: -5.0,
     well_v: 0.0,
     well_parity: 0.0,
     well_odd_par: 0.0,
     well_flat_parity: 0.0,
-    tspin_bonus: 00.0,
-    tspin_score: 15.0,
-    average_h : 1.0,
+    tspin_bonus: 25.0,
+    tspin_score: 25.0,
+    average_h : 0.0,
     sum_attack: 0.0,
     sum_downstack: 0.0,
-    attack: 40.0,
+    attack: 100.0,
     downstack: 10.0,
     eff: 100.0,
 };
 
 const WEIGHTS_DS: Weights = Weights {
     hole: -150.0,
-    hole_depth: 0.0,
-    h_local_deviation: -10.0,
+    hole_depth: -20.0,
+    h_local_deviation: -20.0,
     h_global_deviation: -8.0,
     well_v: 0.0,
     well_parity: 0.0,
     well_odd_par: 0.0,
     well_flat_parity: 0.0,
-    tspin_bonus: -150.0, // Same as hole
+    tspin_bonus: 0.0,
     tspin_score: 0.0,
     average_h : -20.0,
     sum_attack: 0.0,
-    sum_downstack: 35.0,
+    sum_downstack: 0.0,
     attack: 0.0,
     downstack: 50.0,
     eff: 0.0,
@@ -104,9 +103,11 @@ const FACTORS_DS: Factors = Factors {
     well_threshold: 20.0,
 };
 
-const DS_HEIGHT_THRESHOLD: f32 = 14.0;
-const DS_HOLE_THRESHOLD  : u32 = 2;
+const DS_HEIGHT_THRESHOLD: f32 = 10.0;
+const DS_HOLE_THRESHOLD  : u32 = 4;
 const DS_MODE_PENALTY    : f32 = -400.0;
+const HOLE_DEPTH_RELEVANCY_THRESHOLD: u32 = 6; // holes deeper than this are ignored, since they
+                                               // aren't important in the near future.
 const WELL_PLACEMENT_F   : f32 = 70.0;
 const WELL_PLACEMENT     : [f32; 10] = [-0.5, -1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, -1.0, -0.5];
 //const WELL_PLACEMENT     : [f32; 10] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
@@ -209,6 +210,8 @@ impl Tspins {
 
 /// Heuristic Evaluation function
 pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
+
+
     let mut score = 0.0;
     let b = &state.board;
 
@@ -224,10 +227,10 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
         .into_iter()
         .enumerate()
         .map(|(i, mut col)| {
-            // Ignore tspins
-            if tspins.contains(i) {
+            if tspins.contains(i + 1) || (i > 0 && tspins.contains(i - 1)) {
                 return (0, 0)
             }
+
             let mut holes = 0;
             let mut depth = 0;
 
@@ -235,18 +238,21 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             // If the first bit is not set, it should be a hole.
             for y in 0..h[i] {
                 if col & 1 == 0 {
-                    holes += 1;
-                    depth += (h[i] - y) * (h[i] - y);
+                    let d = h[i] - y;
+                    if d < HOLE_DEPTH_RELEVANCY_THRESHOLD {
+                        holes += 1;
+                        depth += d * d;
+                    }
                 }
                 col >>= 1;
             }
+
             (holes, depth)
         })
         .unzip();
 
     let depth_sum_sq = depth_sum_sq.iter().sum::<u32>();
-    let holes = holes.iter().sum::<i32>() - tspins.overhangs as i32;
-    let holes = holes.max(0) as u32;
+    let holes = holes.iter().sum::<u32>();
 
     // Select weights
     // Will use DS if
@@ -267,9 +273,6 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
     };
 
     // Score by Tspins
-    #[cfg(test)]
-    println!("tspins.count() = {}", tspins.count());
-
     score += tspins.count() as f32 * weights.tspin_bonus;
     score += tspins.score as f32 * weights.tspin_score;
 
@@ -322,7 +325,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             .sum();
 
         // T-spin compensation
-        score -= tspins.count() as f32 * 5.0 * weights.h_global_deviation;
+        //score -= tspins.count() as f32 * 5.0 * weights.h_global_deviation;
 
         score += sum_sq * weights.h_global_deviation;
     }
@@ -387,9 +390,11 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
 
     // clear and attack
     score += (meta.attacks as i32 - meta.ds as i32) as f32 * weights.eff;
-
     score += meta.attacks as f32 * weights.attack;
     score += meta.ds as f32 * weights.downstack;
     
+    // if meta.tspin && meta.attacks == 4 {
+    //     println!("tspin found with attack: {}, score: {}", meta.attacks, score);
+    // }
     score
 }
