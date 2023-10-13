@@ -122,18 +122,21 @@ impl SimState {
     }
 
     /// Generates garbage lines
-    pub fn gen_garbage<R> (&mut self, lines: usize) {
+    pub fn gen_garbage<R> (&mut self, lines: usize, rand: &mut R) 
+    where 
+        R: rand::Rng 
+    {
         let lines = lines.min(10);
 
-        let i = rand::random::<u32>().clamp(0, 9);
+        let i = rand.gen_range(0..9);
         let mut garbage_row = [Piece::O; 10];
         garbage_row[i as usize] = Piece::None;
 
-        for y in 0..20 {
+        for y in (0..20).rev() {
             if y < lines {
                 self.v[y] = garbage_row;
             } else {
-                self.v[y-lines] = self.v[y];
+                self.v[y] = self.v[y-lines];
             }
         }
 

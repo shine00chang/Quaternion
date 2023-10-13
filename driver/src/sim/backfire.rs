@@ -4,10 +4,8 @@ use std::thread;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 
-use quaternion::game;
-use super::state;
 use super::stats::Stats;
-use crate::colors::*;
+use crate::*;
 
 
 pub fn run (args: crate::Args) {
@@ -18,27 +16,34 @@ pub fn run (args: crate::Args) {
     println!("pps:     {}", args.pps);
 
     let mut stats = Stats::new();
-    let mut state = state::State::new(game::State::new());
+    let mut state = quaternion::SimState::new();
     let mut rng   = ChaCha8Rng::seed_from_u64(2);
     let bot       = quaternion::Quaternion::with_threads(args.threads);
     
-    state.draw(&mut rng);
-
     println!("init state:\n{}", state);
-    bot.advance(state.get_state().clone());
+    bot.advance(&state);
     bot.start();
 
     for _ in 0..args.iters {
         thread::sleep(Duration::from_millis((1000.0 / args.pps) as u64));
 
-        let (mv, game_state) = bot.solution();
-        let bot_stats = bot.stats();
-        state.advance(&mv, &game_state);
-        state.draw(&mut rng);
-        bot.advance(state.get_state().clone());
+        // Get solution & stats
+        let mov = bot.solution();
+        let (n_state, move_stats) = state.advance(&mov);
+        stats.accumulate(&move_stats, &bot.stats());
+        state = n_state;
 
-        stats.accumulate(&game_state, &bot_stats);
-        println!("{}", state);
+        // Advance
+        let backfire = move_stats.attacks as f32 * 0.75;
+        state.gen_garbage(backfire as usize, &mut rng);
+        bot.advance(&state);
+
+        // Refresh bag
+        state.draw();
+
+        // Render
+        println!("{state}");
+        println!("{:?}", move_stats);
     }
     bot.stop();
     println!("{}", stats);

@@ -26,8 +26,8 @@ pub struct Args {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Mode {
     Sandbox,
+    Backfire
 //    Cheese,
-//    Backfire
 }
 
 fn main() {
@@ -37,8 +37,8 @@ fn main() {
 
     match args.mode {
         Mode::Sandbox  => sim::sandbox::run(args),
+        Mode::Backfire => sim::backfire::run(args),
 //        Mode::Cheese   => sim::cheese::run(args),
-//        Mode::Backfire => sim::backfire::run(args),
         _ => println!("Not yet implemented")
     }
 }

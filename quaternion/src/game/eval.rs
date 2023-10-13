@@ -14,6 +14,8 @@ pub enum Mode {
 struct Factors {
     ideal_h: f32,
     well_threshold: f32,
+    hole_depth_relevancy_threshold: u32 // holes deeper than this are ignored, since they
+                                        // aren't important in the near future.
 }
 
 struct Weights {
@@ -28,38 +30,14 @@ struct Weights {
     tspin_bonus: f32,
     tspin_score: f32,
     average_h: f32,
-    sum_attack: f32,
-    sum_downstack: f32,
     attack: f32,
     downstack: f32,
     eff: f32,
 } 
 
-
-/*
-const WEIGHTS_ATK: Weights = Weights {
-    hole: -40.0,
-    hole_depth: -10.0,
-    h_local_deviation: -3.0,
-    h_global_deviation: -2.0,
-    well_v: 1.0,
-    well_parity: -3.0,
-    well_odd_par: -30.0,
-    well_flat_parity: 40.0,
-    tspin_flat_bonus: 40.0,
-    tspin_dist: -2.0,
-    tspin_completeness: 4.0,
-    average_h : 0.0,
-    sum_attack: 25.0,
-    sum_downstack: 15.0,
-    attack: 50.0,
-    downstack: 10.0,
-    eff: 100.0,
-};
-*/
 const WEIGHTS_ATK: Weights = Weights {
     hole: -150.0,
-    hole_depth: -20.0,
+    hole_depth: -12.0,
     h_local_deviation: -6.0,
     h_global_deviation: -5.0,
     well_v: 0.0,
@@ -69,16 +47,14 @@ const WEIGHTS_ATK: Weights = Weights {
     tspin_bonus: 25.0,
     tspin_score: 25.0,
     average_h : 0.0,
-    sum_attack: 0.0,
-    sum_downstack: 0.0,
     attack: 100.0,
     downstack: 10.0,
-    eff: 100.0,
+    eff: 130.0,
 };
 
 const WEIGHTS_DS: Weights = Weights {
     hole: -150.0,
-    hole_depth: -20.0,
+    hole_depth: -10.0,
     h_local_deviation: -20.0,
     h_global_deviation: -8.0,
     well_v: 0.0,
@@ -88,29 +64,27 @@ const WEIGHTS_DS: Weights = Weights {
     tspin_bonus: 0.0,
     tspin_score: 0.0,
     average_h : -20.0,
-    sum_attack: 0.0,
-    sum_downstack: 0.0,
     attack: 0.0,
-    downstack: 50.0,
+    downstack: 100.0,
     eff: 0.0,
 };
+
 const FACTORS_ATK: Factors = Factors {
     ideal_h: 0.0,
     well_threshold: 3.0,
+    hole_depth_relevancy_threshold: 6
 };
+
 const FACTORS_DS: Factors = Factors {
     ideal_h: 0.0,
     well_threshold: 20.0,
+    hole_depth_relevancy_threshold: 6
 };
 
 const DS_HEIGHT_THRESHOLD: f32 = 10.0;
-const DS_HOLE_THRESHOLD  : u32 = 4;
-const DS_MODE_PENALTY    : f32 = -400.0;
-const HOLE_DEPTH_RELEVANCY_THRESHOLD: u32 = 6; // holes deeper than this are ignored, since they
-                                               // aren't important in the near future.
+const DS_MODE_PENALTY    : f32 = 0.0;
 const WELL_PLACEMENT_F   : f32 = 70.0;
 const WELL_PLACEMENT     : [f32; 10] = [-0.5, -1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, -1.0, -0.5];
-//const WELL_PLACEMENT     : [f32; 10] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
 
 
 struct Tspin {
@@ -158,6 +132,7 @@ impl Tspins {
             return None;
         }
 
+        // Preliminary checks, check for shape.
         let prelim = 
             !board.occupied(x, y) &&
             !board.occupied(x, y-1) &&
@@ -172,9 +147,23 @@ impl Tspins {
             return None;
         }
 
+        // Check if overhang exists
         let overhang = board.occupied(x-1, y+1) ^ board.occupied(x+1, y+1);
 
+        // Check for access (Harms dono's)
         let x = x as usize;
+        let access =
+            if board.v[x] >> y == 0 { 1 } else { 0 } +
+            if board.v[x-1] >> y == 0 { 1 } else { 0 } +
+            if board.v[x+1] >> y == 0 { 1 } else { 0 };
+
+        // if there are less than two accessible columns OR
+        // if there are only two but without an overhang => improper overhang
+        if access < 2 || access == 2 && !overhang {
+            return None;
+        }
+
+        // Check if rows are filled
         let row1 = board.v
             .iter()
             .enumerate()
@@ -222,7 +211,23 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
     let h = b.v.map(|col| 32-col.leading_zeros());
     let avg_h = h.iter().sum::<u32>() as f32 / 10.0;
 
-    let (holes, depth_sum_sq): (Vec<_>, Vec<_>) = b.v
+    // Select weights
+    // Will use DS if average height past threshold
+    let (weights, factors) = {
+        match mode {
+            Mode::Norm =>
+                if  avg_h >= DS_HEIGHT_THRESHOLD {
+                    score += DS_MODE_PENALTY;
+                    (WEIGHTS_DS, FACTORS_DS)
+                } else {
+                    (WEIGHTS_ATK, FACTORS_ATK)
+                },
+            Mode::DS => (WEIGHTS_DS, FACTORS_DS),
+            Mode::Attack => (WEIGHTS_ATK, FACTORS_ATK),
+        }
+    };
+
+    let (holes, depth_sum_sq): (u32, u32) = b.v
         .clone()
         .into_iter()
         .enumerate()
@@ -233,44 +238,28 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
 
             let mut holes = 0;
             let mut depth = 0;
+            let mut maxd = None;
 
             // Detect each hole by shifting the column down.
-            // If the first bit is not set, it should be a hole.
+            // If the first bit is set and the second is not, it should be a hole.
             for y in 0..h[i] {
                 if col & 1 == 0 {
-                    let d = h[i] - y;
-                    if d < HOLE_DEPTH_RELEVANCY_THRESHOLD {
-                        holes += 1;
-                        depth += d * d;
+                    maxd = Some( maxd.unwrap_or(0).max(h[i] - y) );
+                } else if let Some(d) = maxd {
+                    if h[i] - y > factors.hole_depth_relevancy_threshold {
+                        continue;
                     }
+                    depth += d * d;
+                    holes += 1;
+
+                    maxd = None;
                 }
                 col >>= 1;
             }
 
             (holes, depth)
         })
-        .unzip();
-
-    let depth_sum_sq = depth_sum_sq.iter().sum::<u32>();
-    let holes = holes.iter().sum::<u32>();
-
-    // Select weights
-    // Will use DS if
-    // -> holes
-    // -> average height past threshold
-    let (weights, factors) = {
-        match mode {
-            Mode::Norm =>
-                if  avg_h >= DS_HEIGHT_THRESHOLD || holes >= DS_HOLE_THRESHOLD {
-                    score += DS_MODE_PENALTY;
-                    (WEIGHTS_DS, FACTORS_DS)
-                } else {
-                    (WEIGHTS_ATK, FACTORS_ATK)
-                },
-            Mode::DS => (WEIGHTS_DS, FACTORS_DS),
-            Mode::Attack => (WEIGHTS_ATK, FACTORS_ATK),
-        }
-    };
+        .fold((0,0), |a, t| (a.0 + t.0, a.1 + t.1));
 
     // Score by Tspins
     score += tspins.count() as f32 * weights.tspin_bonus;
@@ -303,10 +292,8 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
 
     // Score by avg_h height
     // Must consider this score AFTER the well has been removed from the average.
-    {
-        let dh = (avg_h - factors.ideal_h).abs();
-        score += weights.average_h * dh * dh;
-    }
+    let dh = (avg_h - factors.ideal_h).abs();
+    score += weights.average_h * dh * dh;
 
     // Score by dh from average
     {
@@ -324,9 +311,6 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             })
             .sum();
 
-        // T-spin compensation
-        //score -= tspins.count() as f32 * 5.0 * weights.h_global_deviation;
-
         score += sum_sq * weights.h_global_deviation;
     }
 
@@ -340,7 +324,7 @@ pub fn evaluate (state: &State, meta: MoveStats, mode: Mode) -> f32 {
             if x == well.unwrap_or_else(|| (100, 0.0)).0 { continue }
             
             // Ignore T-spin
-            if tspins.contains(x) { continue }
+            //if tspins.contains(x) { continue }
 
             if let Some(prev) = prev {
                 let d = h[x].abs_diff(prev);

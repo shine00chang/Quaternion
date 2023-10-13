@@ -102,21 +102,33 @@ impl Worker {
             return
         }
         
-        let children: Vec<_> = {
+        let children: Vec<_> = 'gen: {
             let nodes = gen_children(selection.get_state());
             self.state.lock().stats.nodes += nodes.len() as u64;
 
+            if nodes.len() == 0 {
+                break 'gen vec![]
+            }
+
             let nodes = prune_children(nodes, &selection);
+
             nodes
                 .into_iter()
                 .map(|i| Arc::new(Mutex::new(i)))
                 .collect()
         };
 
-        { // Add children
-            let backprop = selection.expand(children);
+        // If no nodes, make backprop 0.
+        if children.is_empty() {
+            let backprop = Backprop::doomed();
             selection.backprop(backprop);
+
+            return
         }
+
+        // Add children
+        let backprop = selection.expand(children);
+        selection.backprop(backprop);
     }
 
     pub fn work_loop (&self) {

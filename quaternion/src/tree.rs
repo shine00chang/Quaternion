@@ -245,15 +245,13 @@ impl Node {
     }
 
     pub fn expand (&mut self, children: Vec<Arc<Mutex<Node>>>) -> Backprop {
-        let backprop = {
-            let max_eval = children
+        let backprop = Backprop {
+            score: children
                 .iter()
                 .map(|c| c.lock().eval.clone())
                 .max_by(|a, b| a.partial_cmp(&b).unwrap())
                 .unwrap()
-                .clone();
-
-            Backprop { score: max_eval.get() }
+                .get()
         };
 
         self.children = children;
@@ -332,4 +330,11 @@ impl Selection {
 
 pub struct Backprop {
     score: f32,
+}
+impl Backprop {
+    pub fn doomed () -> Self {
+        Backprop {
+            score: -100_000.0
+        }
+    }
 }
