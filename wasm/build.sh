@@ -18,7 +18,7 @@ RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' \
 # Note the usage of `--target no-modules` here which is required for passing
 # the memory import to each wasm module.
 wasm-bindgen ../target/wasm32-unknown-unknown/release/wasm_driver.wasm \
-  --out-dir ./wb-out \
+  --out-dir ./dist/ \
   --target no-modules \
   --no-typescript
 

@@ -89,7 +89,7 @@ impl Worker {
         }
     }
 
-    fn work (&self) {
+    pub fn work (&self) {
         let selection = 
             if let Some (out) = self.tree.read().select() {
                 out

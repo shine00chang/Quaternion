@@ -21,7 +21,7 @@ pub fn run (args: crate::Args) {
     let bot       = quaternion::Quaternion::with_threads(args.threads);
     
     println!("init state:\n{}", state);
-    bot.advance(&state);
+    bot.advance(state.get_state());
     bot.start();
 
     for _ in 0..args.iters {
@@ -34,7 +34,7 @@ pub fn run (args: crate::Args) {
         state = n_state;
 
         // Advance
-        bot.advance(&state);
+        bot.advance(state.get_state());
 
         // Refresh bag
         state.draw();

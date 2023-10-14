@@ -1,8 +1,8 @@
-use std::time::Duration;
 use std::collections::VecDeque;
 
-use wasm_thread as thread;
 use wasm_bindgen::prelude::*;
+
+use quaternion::Piece as QPiece;
 
 macro_rules! console_log {
     ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
@@ -29,45 +29,42 @@ pub enum Piece {
     T = 5,
     I = 6,
     O = 7,
-    Some = 8,
     None = 0,
 }
+
 impl Piece {
-    fn to_bot (self) -> quaternion::game::Piece {
+    fn to_bot (self) -> QPiece {
         match self {
-            Piece::T => quaternion::game::Piece::T,
-            Piece::I => quaternion::game::Piece::I,
-            Piece::L => quaternion::game::Piece::L,
-            Piece::J => quaternion::game::Piece::J,
-            Piece::S => quaternion::game::Piece::S,
-            Piece::Z => quaternion::game::Piece::Z,
-            Piece::O => quaternion::game::Piece::O,
-            Piece::Some => quaternion::game::Piece::O, // Inaccuracy, but should not have repercussions
-            Piece::None => quaternion::game::Piece::None,
+            Piece::T => QPiece::T,
+            Piece::I => QPiece::I,
+            Piece::L => QPiece::L,
+            Piece::J => QPiece::J,
+            Piece::S => QPiece::S,
+            Piece::Z => QPiece::Z,
+            Piece::O => QPiece::O,
+            Piece::None => QPiece::None,
         }
     }
 }
 
 #[wasm_bindgen]
-#[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Key {
-    None        = 0,
-    Left        = 1,
-    Right       = 2,
-    Cw          = 3,
-    Ccw         = 4,
-    _180        = 5,
-    HardDrop    = 6,
-    SoftDrop    = 7,
-    Hold        = 8
+    L    = 1,
+    R    = 2,
+    CW   = 3,
+    CCW  = 4,
+    Drop = 5,
+    Hold = 6,
+    HardDrop = 0, // Symbolizes end of list
 }
 
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct Input {
-    board: Vec<Piece>,
-    pieces: Vec<Piece>,
-    hold: Piece,
+    board: [[bool; 10]; 20],
+    pieces: [QPiece; 6],
+    hold: Option<QPiece>,
 }
 
 #[wasm_bindgen]
@@ -75,118 +72,72 @@ impl Input {
     #[wasm_bindgen]
     pub fn new () -> Self {
         Self {
-            board:  vec![Piece::None; 200],
-            pieces: vec![Piece::None; 6],
-            hold:   Piece::None,
+            board:  [[false; 10]; 20],
+            pieces: [QPiece::None; 6],
+            hold:   None,
         }
     }
 
     #[wasm_bindgen]
-    pub fn set_board(&mut self, x: usize, y: usize, p: Piece) {
-        self.board[y*10 + x] = p;
+    pub fn set_board(&mut self, x: usize, y: usize) {
+        assert!(x < 10 && y < 20);
+        self.board[y][x] = true;
     }
 
     #[wasm_bindgen]
     pub fn set_pieces(&mut self, i: usize, p: Piece) {
-        self.pieces[i] = p;
+        assert!(i < 6);
+        self.pieces[i] = p.to_bot();
     }
 
     #[wasm_bindgen]
     pub fn set_hold(&mut self, p: Piece) {
-        self.hold = p;
+        if p == Piece::None {
+            self.hold = None;
+        } else {
+            self.hold = Some(p.to_bot());
+        }
     }
 
-    fn parse (&self) -> quaternion::game::State {
-        // Set Board
-        let mut state = quaternion::game::State::new();
+    fn parse (self) -> quaternion::State {
+        let state = quaternion::State::from_js(self.board, self.pieces, self.hold);
+        console_log!("{state}");
 
-        for y in 0..20 {
-            for x in 0..10 {
-                if self.board[y*10 +x] != Piece::None {
-                    state.field.m[y] += 1 << x;
-                }
-            }
-        }
-
-        // Set Piece
-        for p in &self.pieces {
-            state.pieces.push_back(p.to_bot());
-        }
-
-        // Set Hold
-        state.hold = self.hold.to_bot();
-
-        console_log!("Input State (wasm-driver):\n{}", state);
         state
     }
-
-    // Testing Purposes
-    #[wasm_bindgen]
-    pub fn test (&self, p: Piece) {
-        console_log!("== Test ==: Hello From Rust!!");
-        console_log!("== Test ==: Piece: {:?}", p);
-    }
 }
 
 #[wasm_bindgen]
-pub struct Prog {
+pub struct Wrapper {
     bot: quaternion::Quaternion,
+    state: Option<quaternion::State>,
 }
 
 #[wasm_bindgen]
-impl Prog {
+impl Wrapper {
     #[wasm_bindgen]
     pub fn new (threads: u32) -> Self {
         Self {
-            bot: quaternion::Quaternion::with_threads(threads),
+            bot: quaternion::Quaternion::single(),
+            state: None
         }
     }
 
     #[wasm_bindgen]
-    pub fn test (&self) {
-        let handles: Vec<_> = (0..10)
-            .map(|i| {
-                thread::spawn(move || {
-                    thread::sleep(Duration::from_secs(1));
-                    console_log!("Done {i}");
-                })
-            })
-            .collect();
+    pub fn run (&mut self, ms: u32) -> Output {
+        let mov = self.bot.wasm_run(ms);
+        console_log!("{:?}", mov.parse_list());
+        let state = self.state.clone().unwrap();
+        let state = state.apply_move(&mov);
+        console_log!("{}", state);
 
-        thread::spawn(move || {
-            for h in handles {
-                h.join().unwrap();
-            }
-            console_log!("Rust join thread done.");
-        });
-        console_log!("Rust main thread done.");
+        Output::from(mov)
     }
 
     #[wasm_bindgen]
-    pub fn stop (&self) {
-        self.bot.stop()
-    }
-
-    #[wasm_bindgen]
-    pub fn start (&self) {
-        self.bot.start()
-    }
-
-    #[wasm_bindgen]
-    pub fn end (self) {
-        self.bot.end()
-    }
-
-    #[wasm_bindgen]
-    pub fn solution (&self) -> Output {
-        let (mv, state) = self.bot.solution();
-        print_state(state);
-        Output::new(mv)
-    }
-
-    #[wasm_bindgen]
-    pub fn advance (&self, input: Input) {
-        self.bot.advance(input.parse());
+    pub fn advance (&mut self, input: Input) {
+        self.state = Some( input.parse() );
+        self.bot.advance(&self.state.clone().unwrap());
     }
 }
 
@@ -197,20 +148,20 @@ pub struct Output {
 }
 
 impl Output {
-    pub fn new (mov: quaternion::game::Move) -> Self {
-        let mut list: VecDeque<Key> = VecDeque::new();
-        mov.parse_list().iter().for_each(|k| match k {
-            quaternion::game::Key::Left       => list.push_back(Key::Left),
-            quaternion::game::Key::Right      => list.push_back(Key::Right),
-            quaternion::game::Key::DASLeft    => for _ in 0..5 { list.push_back(Key::Left) },
-            quaternion::game::Key::DASRight   => for _ in 0..5 { list.push_back(Key::Left) },
-            quaternion::game::Key::Cw         => list.push_back(Key::Cw),
-            quaternion::game::Key::Ccw        => list.push_back(Key::Ccw),
-            quaternion::game::Key::_180       => list.push_back(Key::_180),
-            quaternion::game::Key::HardDrop   => list.push_back(Key::HardDrop),
-            quaternion::game::Key::SoftDrop   => list.push_back(Key::SoftDrop),
-            quaternion::game::Key::Hold       => list.push_back(Key::Hold)
-        });
+    pub fn from (mov: quaternion::Move) -> Self {
+        let mut list: VecDeque<_> = mov
+            .parse_list()
+            .iter()
+            .map(|k| match k {
+                quaternion::Key::L    => Key::L,
+                quaternion::Key::R    => Key::R,
+                quaternion::Key::CW   => Key::CW,
+                quaternion::Key::CCW  => Key::CCW,
+                quaternion::Key::Drop => Key::Drop,
+                quaternion::Key::Hold => Key::Hold
+            })
+            .collect();
+        list.push_back(Key::HardDrop);
         Self { list }
     }
     pub fn none () -> Self {
@@ -222,35 +173,14 @@ impl Output {
 impl Output {
     #[wasm_bindgen]
     pub fn next (&mut self) -> Key {
-        self.list.pop_front().unwrap_or(Key::None)
+        self.list.pop_front().unwrap()
     }
 }
 
 
-fn print_state (s: quaternion::game::State) {
-
-    let mut str = String::from("");
-    for y in 0..20 {
-        for x in 0..10 {
-            let b: bool = (s.field.m[y] & (1 << x)) >> x == 1;
-            if b {
-                str.push_str(&format!("# "));
-            } else {
-                str.push_str(&format!(". "));
-            }
-        }
-        str.push_str(" ");
-        match y {
-            0 => str.push_str(&format!("b2b:   {:>2}", s.props.b2b)),
-            1 => str.push_str(&format!("combo: {:>2}", s.props.combo)),
-            3 => str.push_str(&format!("hold:  {:?}", s.hold)),
-            4 => str.push_str(&format!("queue:")),
-            5..=9 => if s.pieces.len() > y-5 {
-                str.push_str(&format!("{:?}", s.pieces[y-5]))
-            },
-            _ => ()
-        };
-        str.push_str("\n");
-    }
-    console_log!("{}", str);
+use std::fmt::Write;
+fn print_state (s: quaternion::State) {
+    let mut f = String::new();
+    write!(f, "{s}").unwrap();
+    console_log!("{f}");
 }

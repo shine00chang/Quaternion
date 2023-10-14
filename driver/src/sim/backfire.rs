@@ -21,7 +21,7 @@ pub fn run (args: crate::Args) {
     let bot       = quaternion::Quaternion::with_threads(args.threads);
     
     println!("init state:\n{}", state);
-    bot.advance(&state);
+    bot.advance(state.get_state());
     bot.start();
 
     for _ in 0..args.iters {
@@ -36,7 +36,7 @@ pub fn run (args: crate::Args) {
         // Advance
         let backfire = move_stats.attacks as f32 * 0.75;
         state.gen_garbage(backfire as usize, &mut rng);
-        bot.advance(&state);
+        bot.advance(state.get_state());
 
         // Refresh bag
         state.draw();

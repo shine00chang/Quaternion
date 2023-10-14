@@ -3,6 +3,8 @@ use std::collections::VecDeque;
 pub mod movegen;
 pub mod advance;
 pub mod eval;
+
+#[cfg(not(target_family = "wasm"))]
 pub mod sim;
 
 /*
@@ -146,6 +148,29 @@ pub struct State {
     combo: u8,
 }
 impl State {
+    // For WASM driver
+    pub fn from_js (board: [[bool; 10]; 20], queue: [Piece; 6], hold: Option<Piece>) -> Self {
+        let board = {
+            let mut v = [0; 10];
+            for x in 0..10 {
+                for y in 0..20 {
+                    if board[y][x] {
+                        v[x] += 1 << (19-y);
+                    }
+                }
+            }
+            Board { v }
+        };
+
+        State {
+            board,
+            queue: queue.into_iter().collect(),
+            hold,
+            b2b: 0,
+            combo: 0,
+        }
+    }
+
     /// For testing. Creates a State object given the textual formatting of a state.
     pub fn from_str (s: &str) -> Self {
         let s = s.trim();

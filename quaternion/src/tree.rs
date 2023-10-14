@@ -1,7 +1,6 @@
 use std::sync::Arc; 
 use parking_lot::{Mutex, RwLock};
 use super::game;
-use rand::Rng;
 
 const CUTOFF_F: f32 = 0.2;
 
@@ -234,10 +233,6 @@ impl Node {
 
             self.expansions += 1;
 
-            // let i = rand::thread_rng().gen_range(0..candidates.len()) as usize;
-            // SelectionResult::Continue(candidates[i].clone())
-
-            
             let out = candidates.iter().min_by_key(|c| c.lock().expansions).unwrap();
             SelectionResult::Continue((*out).clone())
             

@@ -68,6 +68,10 @@ impl SimState {
         out
     }
 
+    pub fn get_state (&self) -> &State {
+        &self.state
+    }
+
     /// Creates SimState from textual representation.
     pub fn from_str (s: &str) -> Self {
         let s = s.trim();

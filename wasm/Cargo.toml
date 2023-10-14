@@ -2,17 +2,15 @@
 name = "wasm_driver"
 version = "0.1.0"
 authors = ["Shine Chang"]
-edition = "2018"
-rust-version = "1.56"
+edition = "2021"
+rust-version = "1.72"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 js-sys = "0.3.64"
-rayon = "1.1.0"
 wasm-bindgen = "0.2.87"
-wasm_thread = "0.2.0"
 
 quaternion = { path = "../quaternion" }
 

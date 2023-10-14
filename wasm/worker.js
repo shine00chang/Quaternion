@@ -1,8 +1,6 @@
-(async () => {
-
 // Load wasm
 {
-await importScripts("./wb-out/wasm_driver.js");
+await importScripts("./dist/wasm_driver.js");
 
 let msg = 'This demo requires a current version of Firefox (e.g., 79.0)';
 if (typeof SharedArrayBuffer !== 'function') {
@@ -125,6 +123,3 @@ onmessage = e => {
         start();
     }
 }
-
-
-})();
